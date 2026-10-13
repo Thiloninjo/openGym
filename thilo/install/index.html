@@ -1,0 +1,14 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0A0907"><title>openGym installieren</title>
+<style>body{margin:0;background:#0A0907;color:#F7F1E6;font-family:-apple-system,system-ui;display:grid;place-items:center;min-height:100vh;padding:24px;box-sizing:border-box}a.btn{display:inline-block;padding:18px 30px;border-radius:18px;background:linear-gradient(135deg,#F5D48A,#C9953C);color:#1A1207;font-weight:700;font-size:18px;text-decoration:none;box-shadow:0 0 24px rgba(230,184,92,.35)}p{color:#9C9282;max-width:320px;text-align:center;line-height:1.5}h1{color:#E6B85C;margin:0 0 6px}#v{color:#F5D48A;font-weight:600;margin-bottom:22px}small{color:#6f675a}</style></head>
+<body><div style="text-align:center"><h1>openGym</h1><div id="v">Version wird geladen …</div>
+<a class="btn" href="itms-services://?action=download-manifest&url=https://gym.46-225-160-248.nip.io/install/manifest.plist">Installieren</a>
+<p>Immer die neueste Version. Drüberinstallieren behält alle Daten.<br><small>Diese Seite bleibt gleich: „Teilen“, „Zum Home-Bildschirm“.</small></p></div>
+<script>
+fetch("manifest.plist?"+Date.now(),{cache:"no-store"}).then(r=>r.text()).then(t=>{
+  const m=t.match(/<key>bundle-version<\/key>\s*<string>([^<]+)<\/string>/);
+  return fetch("openGym.ipa",{method:"HEAD",cache:"no-store"}).then(h=>{
+    const d=h.headers.get("last-modified"); const when=d?new Date(d).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"";
+    document.getElementById("v").textContent=(m?"Version "+m[1]:"Version unbekannt")+(when?" · "+when:"");
+  });
+}).catch(()=>{document.getElementById("v").textContent="";});
+</script></body></html>

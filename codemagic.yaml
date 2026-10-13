@@ -1,0 +1,80 @@
+# Codemagic für Thilos openGym-Fork (nicht Teil des Originals).
+# ios-adhoc: baut die Capacitor-App (frontend/ios) signiert als Ad-hoc und legt ipa und Manifest
+# auf den Hetzner: https://gym.46-225-160-248.nip.io/install/
+# Variablen (App-Ebene, Gruppe opengym): CERTIFICATE_PRIVATE_KEY, HETZNER_DEPLOY_KEY.
+workflows:
+  ios-adhoc:
+    name: iPhone-Build (Ad-hoc, signiert)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
+    integrations:
+      app_store_connect: TTCount_ASC_Key
+    environment:
+      xcode: latest
+      node: 22
+      cocoapods: default
+      groups:
+        - opengym
+      vars:
+        BUNDLE_ID: de.thilo.opengym
+        XCODE_PROJECT: frontend/ios/App/App.xcodeproj
+        XCODE_WORKSPACE: frontend/ios/App/App.xcworkspace
+    scripts:
+      - name: Bundle-ID, Zertifikat und Ad-hoc-Profil holen oder anlegen
+        script: |
+          keychain initialize
+          app-store-connect bundle-ids create "$BUNDLE_ID" --name "openGym" --platform IOS || echo "Bundle-ID existiert schon"
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_ADHOC --create
+          keychain add-certificates
+      - name: Web-App für das Handy bauen und in iOS synchronisieren
+        script: |
+          set -e
+          cd frontend
+          npm ci --ignore-scripts
+          npm run build:mobile
+      - name: Bundle-ID und Build-Nummer setzen
+        script: |
+          set -e
+          sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = ch.duartesantos.opengym;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = ${BUILD_NUMBER:-1};/g" "$XCODE_PROJECT/project.pbxproj"
+          VER=$(node -p "require('./frontend/package.json').version")
+          sed -i '' "s/MARKETING_VERSION = [0-9.]*;/MARKETING_VERSION = $VER;/g" "$XCODE_PROJECT/project.pbxproj"
+          grep -c "$BUNDLE_ID" "$XCODE_PROJECT/project.pbxproj"
+      - name: Profile anwenden
+        script: xcode-project use-profiles --project "$XCODE_PROJECT"
+      - name: IPA bauen
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme App \
+            --config Release
+      - name: IPA auf den Hetzner legen (Installationsseite)
+        script: |
+          set -e
+          if [ -z "$HETZNER_DEPLOY_KEY" ]; then echo "HETZNER_DEPLOY_KEY fehlt – ipa nur als Artefakt"; exit 0; fi
+          IPA=$(ls build/ios/ipa/*.ipa | head -1)
+          [ -f "$IPA" ] || { echo "keine ipa gefunden"; exit 1; }
+          VER=$(node -p "require('./frontend/package.json').version")
+          mkdir -p ~/.ssh
+          echo "$HETZNER_DEPLOY_KEY" > ~/.ssh/hetzner && chmod 600 ~/.ssh/hetzner
+          ssh-keyscan -H 46.225.160.248 >> ~/.ssh/known_hosts 2>/dev/null
+          sed "s/<string>VERSION<\/string>/<string>$VER (${BUILD_NUMBER:-0})<\/string>/" thilo/install/manifest.plist > /tmp/manifest.plist
+          scp -i ~/.ssh/hetzner -q "$IPA" root@46.225.160.248:/var/www/opengym-install/openGym.ipa
+          scp -i ~/.ssh/hetzner -q /tmp/manifest.plist thilo/install/index.html root@46.225.160.248:/var/www/opengym-install/
+          echo "Installieren: https://gym.46-225-160-248.nip.io/install/"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      email:
+        recipients:
+          - thilo.struebing@gmail.com
+        notify:
+          success: true
+          failure: true
