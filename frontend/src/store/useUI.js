@@ -7,6 +7,7 @@ import { t } from '../lib/i18n.js'
 import { deviceId } from '../lib/push.js'
 import { MOBILE } from '../lib/mobile.js'
 import { armRestAlert, bindNativeRest, disarmRestAlert, holdRestAlert, toneNative } from '../lib/rest-alert.js'
+import { iosRestHold, iosRestStart, iosRestStop } from '../lib/thilo-ios-rest.js'
 import { useStore } from './useStore.js'
 import { REST_MAX } from '../lib/duration.js'
 import { accentValue } from '../lib/accent.js'
@@ -27,6 +28,8 @@ const bookRestEnd = (endsAt, totalSec, kind) => {
   const switching = kind === 'switch'
   if (!MOBILE) { if (!switching) pushRestTimer(Math.max(1, Math.round((endsAt - Date.now()) / 1000))); return }
   const { S } = useStore.getState()
+  // Thilos Fork: iPhone-App, Ton bei gesperrtem Bildschirm und Countdown auf dem Sperrbildschirm.
+  iosRestStart(endsAt, { totalSec, title: switching ? t('Switch sides') : t('Rest'), doneTitle: switching ? t('Switch sides') : t('Rest’s over. Next set!'), sound: S.sound })
   armRestAlert(endsAt, { title: switching ? t('Switch sides') : t('Rest’s over. Next set!'), countdownTitle: switching ? t('Switch sides') : t('Rest'), totalSec, accent: accentValue(S), sound: !!S.sound, classic: restSoundOf(S) === 'classic', tone: restSoundOf(S), vibrate: S.vibrate !== false, alarmBuzz: S.vibrate !== false && !!S.vibrateOnSilent })
     .then(ok => {
       // Only for the rest that asked: one skipped or moved since then has booked its own end.
@@ -308,6 +311,7 @@ export const useUI = create((set, get) => ({
     cancelPushRestTimer()
     const left = Math.max(1, Math.round((tm.endsAt - Date.now()) / 1000))
     holdRestAlert(left, tm.total)
+    iosRestHold(left, tm.total, { title: t('Rest'), doneTitle: t('Rest’s over. Next set!') })
     set({ timer: { ...tm, left, paused: true } })
   },
   // Carrying on from where the pause held it: the end moves out by however long the pause was,
@@ -338,7 +342,7 @@ export const useUI = create((set, get) => ({
     const total = Math.max(tm.total || left, left)
     // Paused, there is no end to move and nothing booked on the server: the time is simply held,
     // and the notification holds the new figure.
-    if (tm.paused) { set({ timer: { ...tm, left, total } }); holdRestAlert(left, total); return }
+    if (tm.paused) { set({ timer: { ...tm, left, total } }); holdRestAlert(left, total); iosRestHold(left, total, { title: t('Rest'), doneTitle: t('Rest’s over. Next set!') }); return }
     const endsAt = tm.endsAt + sec * 1000
     set({ timer: { ...tm, left, total, endsAt } })
     bookRestEnd(endsAt, total, tm.kind)
@@ -375,6 +379,7 @@ export const useUI = create((set, get) => ({
     // Skip, Dismiss, a rest replacing this one and "rest off" all take the native alarm and
     // its notifications down with it, or the alert fires after the user already moved on.
     disarmRestAlert()
+    iosRestStop()
     if (get().timer) cancelPushRestTimer()
     set({ timer: null })
   },
