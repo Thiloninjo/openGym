@@ -2321,4 +2321,7 @@ export default {
   'Your sports watch, calling you back.': 'আপনার স্পোর্টস ঘড়ি আপনাকে ফিরে ডাকছে।',
   'Coach wants you back on the bar.': 'কোচ আপনাকে আবার বারে চান।',
   'Gentle, for headphones or a quiet room.': 'মৃদু, হেডফোন বা শান্ত ঘরের জন্য।',
+  'My exercises': 'আমার ব্যায়াম',
+  'Your own exercises': 'আপনার নিজের ব্যায়াম',
+  'Exercises from your routines and favourites will show up here. Until then, here is the whole library.': 'আপনার রুটিন ও প্রিয় তালিকার ব্যায়াম এখানে দেখা যাবে। ততক্ষণ পুরো লাইব্রেরি দেখুন।',
 }

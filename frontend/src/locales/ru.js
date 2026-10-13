@@ -2246,4 +2246,7 @@ export default {
   'Your sports watch, calling you back.': 'Ваши спортивные часы зовут вас обратно.',
   'Coach wants you back on the bar.': 'Тренер ждёт вас обратно у штанги.',
   'Gentle, for headphones or a quiet room.': 'Тихий, для наушников или спокойного зала.',
+  'My exercises': 'Мои упражнения',
+  'Your own exercises': 'Свои упражнения',
+  'Exercises from your routines and favourites will show up here. Until then, here is the whole library.': 'Здесь появятся упражнения из ваших программ и избранного. А пока — вся библиотека.',
 }

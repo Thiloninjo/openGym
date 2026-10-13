@@ -2245,4 +2245,7 @@ export default {
   'Your sports watch, calling you back.': 'A sportórád visszahív.',
   'Coach wants you back on the bar.': 'Az edző visszavár a rúdhoz.',
   'Gentle, for headphones or a quiet room.': 'Halk, fülhallgatóhoz vagy csendes helyre.',
+  'My exercises': 'Saját gyakorlataim',
+  'Your own exercises': 'Saját gyakorlatok',
+  'Exercises from your routines and favourites will show up here. Until then, here is the whole library.': 'Itt jelennek majd meg a rutinjaid és kedvenceid gyakorlatai. Addig a teljes könyvtárat látod.',
 }

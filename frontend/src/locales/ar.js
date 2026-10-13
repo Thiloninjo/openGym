@@ -2297,4 +2297,7 @@ export default {
   'Your sports watch, calling you back.': 'ساعتك الرياضية تناديك للعودة.',
   'Coach wants you back on the bar.': 'المدرب يريدك أن تعود إلى البار.',
   'Gentle, for headphones or a quiet room.': 'هادئ، للسماعات أو لغرفة هادئة.',
+  'My exercises': 'تماريني',
+  'Your own exercises': 'تمارينك الخاصة',
+  'Exercises from your routines and favourites will show up here. Until then, here is the whole library.': 'ستظهر هنا التمارين من روتيناتك ومفضلتك. حتى ذلك الحين، هذه هي المكتبة كاملة.',
 }

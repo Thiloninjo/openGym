@@ -2242,4 +2242,7 @@ export default {
   'Your sports watch, calling you back.': '你的运动手表在叫你回来。',
   'Coach wants you back on the bar.': '教练等你回到杠铃前。',
   'Gentle, for headphones or a quiet room.': '轻柔，适合耳机或安静的房间。',
+  'My exercises': '我的动作',
+  'Your own exercises': '自定义动作',
+  'Exercises from your routines and favourites will show up here. Until then, here is the whole library.': '你的训练计划和收藏中的动作会显示在这里。在此之前，这里显示完整动作库。',
 }

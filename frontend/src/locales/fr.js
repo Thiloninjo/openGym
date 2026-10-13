@@ -2242,4 +2242,7 @@ export default {
   'Your sports watch, calling you back.': 'Ta montre de sport te rappelle.',
   'Coach wants you back on the bar.': 'Le coach te veut de retour à la barre.',
   'Gentle, for headphones or a quiet room.': 'Tout doux, pour un casque ou une pièce calme.',
+  'My exercises': 'Mes exercices',
+  'Your own exercises': 'Tes propres exercices',
+  'Exercises from your routines and favourites will show up here. Until then, here is the whole library.': 'Les exercices de tes routines et favoris apparaîtront ici. En attendant, voici toute la bibliothèque.',
 }

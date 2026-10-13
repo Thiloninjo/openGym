@@ -1,0 +1,72 @@
+/* Thilos Fork: mehr Bewegung, angelehnt an den Habit-Tracker (SwiftUI .smooth 0.25/0.35 s,
+   Einblenden mit leichtem Skalieren, gleitende Auswahl, federnde Buttons). Liegt als eigene
+   Datei nach index.css, damit Updates vom Original ohne Konflikte übernommen werden können.
+   Die Regel für „Bewegung reduzieren“ aus index.css (prefers-reduced-motion) gilt weiter. */
+
+:root{
+  --fast:200ms; --med:320ms;
+  --ease:cubic-bezier(.32,.72,0,1);
+  --spring:cubic-bezier(.34,1.45,.64,1);
+}
+
+/* Seiten- und Tab-Wechsel: von unten hereingleiten, leicht wachsen. */
+@keyframes viewfade{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+#app.vfade{animation:viewfade 380ms var(--ease) both}
+
+/* Karten und Listenzeilen blenden gestaffelt ein, bei jedem Öffnen einer Ansicht und wenn eine
+   Karte neu erscheint. */
+@keyframes og-in{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+#app .card{animation:og-in 440ms var(--ease) both}
+#app .card:nth-child(2){animation-delay:40ms}
+#app .card:nth-child(3){animation-delay:80ms}
+#app .card:nth-child(4){animation-delay:120ms}
+#app .card:nth-child(5){animation-delay:160ms}
+#app .card:nth-child(6){animation-delay:200ms}
+#app .card:nth-child(n+7){animation-delay:240ms}
+@keyframes og-row{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+#app .lrow{animation:og-row 360ms var(--ease) both}
+#app .lrow:nth-child(2){animation-delay:30ms}
+#app .lrow:nth-child(3){animation-delay:60ms}
+#app .lrow:nth-child(4){animation-delay:90ms}
+#app .lrow:nth-child(5){animation-delay:120ms}
+#app .lrow:nth-child(6){animation-delay:150ms}
+#app .lrow:nth-child(n+7){animation-delay:180ms}
+
+/* Antippen: kurz eindrücken, beim Loslassen federnd zurück. */
+.btn,.card.tappable,.lrow,.chip,.iconbtn{transition:transform 320ms var(--spring),background var(--fast),color var(--fast),opacity var(--fast)}
+.btn:active{transform:scale(.95);transition-duration:90ms}
+.card.tappable:active{transform:scale(.975);transition-duration:90ms}
+.lrow:active,.chip:active,.iconbtn:active{transform:scale(.96);transition-duration:90ms}
+
+/* Tab-Leiste: gleitende Kapsel hinter dem aktiven Tab (TabBar.jsx setzt Position und Breite),
+   das aktive Symbol hüpft kurz. */
+#tabbar{isolation:isolate}
+#tabbar .tab-glow{
+  position:absolute;z-index:-1;top:6px;left:0;height:34px;border-radius:99px;
+  background:color-mix(in srgb,var(--acc) 16%,transparent);
+  transition:transform 420ms var(--spring),width 420ms var(--ease),opacity var(--fast);
+  pointer-events:none;
+}
+#tabbar button{transition:color 260ms var(--ease)}
+@keyframes og-tabpop{0%{transform:scale(.8)}55%{transform:scale(1.14)}100%{transform:none}}
+#tabbar button.on .tab-ic{animation:og-tabpop 460ms var(--spring)}
+#tabbar button.start .cir{transition:transform 320ms var(--spring),box-shadow var(--med)}
+
+/* Menüs von unten: weicher herein, Hintergrund blendet ein. Beim Schließen gleitet eine Kopie
+   hinaus (lib/thilo-ghost.js legt sie in .og-ghost). Dialoge in der Mitte federn auf. */
+@keyframes og-fade{from{opacity:0}to{opacity:1}}
+.mback{animation:og-fade 300ms ease both}
+.sheet{animation:sheetup 480ms var(--ease)}
+.center{animation:pop 380ms var(--spring)}
+.og-ghost{position:fixed;inset:0;z-index:101;pointer-events:none}
+.og-ghost .mback,.og-ghost .sheet,.og-ghost .center{animation:none}
+.og-ghost .mback{transition:opacity 260ms ease}
+.og-ghost .sheet{transition:transform 260ms cubic-bezier(.4,0,1,1)}
+.og-ghost .center{transition:opacity 200ms ease,transform 200ms ease}
+.og-ghost .mback.closing{opacity:0}
+.og-ghost .sheet.closing{transform:translateY(105%)}
+.og-ghost .center.closing{opacity:0;transform:translate(-50%,-50%) scale(.94)}
+
+/* Fortschrittsbalken und Auswahl-Segmente etwas weicher. */
+.seg-sel{transition:transform 420ms var(--spring),width var(--med) var(--ease)!important}
+.wprog i{transition:width 600ms var(--ease)}

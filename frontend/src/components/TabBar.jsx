@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { effectiveRoutineIds, effectiveRoutines } from '../lib/history.js'
@@ -28,8 +29,15 @@ export default function TabBar({ onStart }) {
   // With the connection banner switched off, a sync problem shows as a dot on Home, the tab
   // Settings lives under (#369, #330).
   const trouble = useConnectionTrouble()
-  if (!user && !isGuest) return null
   const cur = loc.pathname.split('/')[1] || 'home'
+  // Thilos Fork: Kapsel, die hinter den aktiven Tab gleitet (thilo-motion.css .tab-glow).
+  const barRef = useRef(null)
+  const [glow, setGlow] = useState(null)
+  useLayoutEffect(() => {
+    const on = barRef.current?.querySelector('button.on:not(.start)')
+    setGlow(on ? { x: on.offsetLeft + 6, w: on.offsetWidth - 12 } : null)
+  }, [cur, user, isGuest])
+  if (!user && !isGuest) return null
   const on = k => cur === k || (cur === 'history' && k === 'stats') || (cur === 'settings' && k === 'home') || (cur === 'muscles' && k === 'library') || (cur === 'structural-balance' && k === 'stats')
 
   const running = !!S.active && cur !== 'workout' && !S.active.editingWorkoutId && !S.active.backfill && S.active.start > 0
@@ -43,7 +51,9 @@ export default function TabBar({ onStart }) {
   }
 
   return (
-    <nav id="tabbar">
+    <nav id="tabbar" ref={barRef}>
+      <span className="tab-glow" aria-hidden="true"
+        style={glow ? { width: glow.w, transform: `translateX(${glow.x}px)` } : { opacity: 0 }} />
       <Tab active={on('home')} icon="house" label={t('Home')} dot={trouble} onClick={() => nav('/home')} />
       <Tab active={on('plan')} icon="calendar" label={t('Plan')} onClick={() => nav('/plan')} />
       {/* On the workout screen itself there is nothing to resume, so the button reads as the

@@ -48,3 +48,24 @@ export function usageOf(S) {
   for (const w of S?.workouts || []) for (const e of w.entries || []) u[e.id] = (u[e.id] || 0) + 1
   return u
 }
+
+/**
+ * The Library's default view: just the exercises that are yours. Each routine's exercises in
+ * routine order, then the favourites no routine holds, then your own exercises found in neither.
+ * Returns [{ key, routine?, fav?, own?, ids }]; empty groups are left out, so an empty list
+ * means you have nothing of your own yet.
+ */
+export function myExerciseGroups(S) {
+  const seen = new Set(), groups = []
+  const rest = ids => ids.filter(id => id != null && !seen.has(id) && seen.add(id))
+  for (const r of S?.routines || []) {
+    const ids = [...new Set((r.ex || []).map(e => e?.id).filter(id => id != null))]
+    ids.forEach(id => seen.add(id))
+    if (ids.length) groups.push({ key: 'r:' + r.id, routine: r, ids })
+  }
+  const fav = rest(favIds(S))
+  if (fav.length) groups.push({ key: 'fav', fav: true, ids: fav })
+  const own = rest((S?.customEx || []).map(c => c?.id))
+  if (own.length) groups.push({ key: 'own', own: true, ids: own })
+  return groups
+}

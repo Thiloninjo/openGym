@@ -1,7 +1,7 @@
-import { useDeferredValue, useMemo, useRef, useState } from 'react'
+import { Fragment, useDeferredValue, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
-import { EXDB, BODYPARTS, allExercises, equipmentOf, byCategory, searchExercises, similarExercises } from '../lib/exercises.js'
+import { EXDB, EXIDX, BODYPARTS, allExercises, equipmentOf, byCategory, searchExercises, similarExercises } from '../lib/exercises.js'
 import { MUSCLE_NAME } from '../lib/muscles.js'
 import { activeProfile, exAvailable } from '../lib/equipment.js'
 import { bestWeightFor } from '../lib/history.js'
@@ -14,7 +14,7 @@ import ExerciseViewToggle from '../components/ExerciseViewToggle.jsx'
 import { Button } from '../components/ui.jsx'
 import { tappable, useRevealActiveChip } from '../lib/use-sheet-keyboard.js'
 import { useAutoMore } from '../lib/use-auto-more.js'
-import { isFav, sortFavouritesFirst, sortYoursFirst, usageOf } from '../lib/favourites.js'
+import { isFav, sortFavouritesFirst, sortYoursFirst, usageOf, myExerciseGroups } from '../lib/favourites.js'
 
 export default function Library() {
   const nav = useNavigate()
@@ -25,12 +25,22 @@ export default function Library() {
   const [cat, setCat] = useState('')
   const [showAll, setShowAll] = useState(false)   // ignore the active equipment profile for this session
   const [shown, setShown] = useState(40)
+  const [mine, setMine] = useState(true)   // "My exercises" (routines, favourites, your own) or the whole catalogue
   const bpStrip = useRef(null), eqStrip = useRef(null), catStrip = useRef(null)
   const moreRef = useAutoMore(() => setShown(s => s + 40))
   const profile = activeProfile(S)
   // Your own exercises, counted the way the list below shows them (allExercises puts every
   // custom entry in front of the catalogue; deleting one removes it from customEx outright).
   const ownCount = (S.customEx || []).filter(c => c && c.id).length
+  // By default the page lists only your exercises, grouped by routine. Typing searches the whole
+  // catalogue as before, and "All" browses it; with nothing of your own yet, the catalogue it is.
+  const groups = useMemo(() => {
+    const own = new Map((S.customEx || []).filter(c => c && c.id).map(c => [c.id, c]))
+    return myExerciseGroups(S)
+      .map(g => ({ ...g, list: g.ids.map(id => own.get(id) || EXIDX[id]).filter(Boolean) }))
+      .filter(g => g.list.length)
+  }, [S.routines, S.favEx, S.customEx])
+  const showMine = mine && groups.length > 0 && !q.trim()
   const inPart = searchExercises(allExercises(S).filter(e => !bp || e.bp === bp), q)
   // Kind of exercise (strength, stretching, cardio...), the same fallback as equipment below: a
   // choice the search or body part has narrowed away is ignored for now, never a dead end.
@@ -49,7 +59,7 @@ export default function Library() {
   useRevealActiveChip(catStrip, catOn)
   // A live count at the end of the search field while a search or filter narrows the list
   // (idea and first version: GitLab !31) — how many are left, before scrolling to find out.
-  const narrowed = !!(q.trim() || bp || eqOn || catOn)
+  const narrowed = !showMine && !!(q.trim() || bp || eqOn || catOn)
   // Close but not exact (a typo too many, most of the words, a similar name), under the results
   // once they are all on screen, so a search almost never ends on "No match".
   // Worked out a beat behind the typing (useDeferredValue): the list itself never waits for it.
@@ -79,39 +89,53 @@ export default function Library() {
       {narrowed && <span className="search-count" role="status" aria-label={exCount(f.length)}>{fmtNum(f.length)}</span>}
       {q && <button className="clear" onClick={() => { setQ(''); setShown(40) }} aria-label={t('Clear')}><Icon name="xmark" /></button>}</div>
       <ExerciseViewToggle /></div>
-    {profile && <div className="small dim row" style={{ margin: '-4px 2px 10px', gap: 6, alignItems: 'center' }}>
-      <Icon name="kettlebell" style={{ fontSize: 13 }} />
-      {showAll ? t('Showing all equipment') : t('Showing what you have in "{0}"', profile.name)}
-      <button className="chip nocap" style={{ marginInlineStart: 'auto', padding: '3px 10px', fontSize: 12 }} onClick={() => setShowAll(v => !v)}>
-        {showAll ? t('Filter by "{0}"', profile.name) : t('Show all equipment')}
-      </button>
-    </div>}
-    {/* Changing body part keeps the equipment filter (issue #71): the eqOn fallback above drops
-        it only for the current view if the new body part has nothing under it, without forgetting
-        the choice. "All" clears it, since it spans every body part. */}
-    <div className="chips" ref={bpStrip} style={{ marginBottom: eqOpts.length > 1 || catOpts.length > 1 ? 8 : 12 }}>
-      <button className={'chip nocap' + (!bp ? ' on' : '')} onClick={() => { setBp(''); setEq(''); setShown(40) }}>{t('All')}</button>
-      {BODYPARTS.map(b => <button key={b} className={'chip' + (bp === b ? ' on' : '')} onClick={() => { setBp(b); setShown(40) }}>{t(b)}</button>)}
-    </div>
-    {catOpts.length > 1 && <div className="chips" ref={catStrip} style={{ marginBottom: 8 }}>
-      <button className={'chip nocap' + (!catOn ? ' on' : '')} onClick={() => { setCat(''); setShown(40) }}>{t('Any type')}</button>
-      {catOpts.map(x => <button key={x} className={'chip' + (catOn === x ? ' on' : '')} onClick={() => { setCat(x); setShown(40) }}>{t(x)}</button>)}
-    </div>}
-    {eqOpts.length > 1 && <div className="chips" ref={eqStrip} style={{ marginBottom: 12 }}>
-      <button className={'chip nocap' + (!eqOn ? ' on' : '')} onClick={() => { setEq(''); setShown(40) }}>{t('Any equipment')}</button>
-      {eqOpts.map(x => <button key={x} className={'chip' + (eqOn === x ? ' on' : '')} onClick={() => { setEq(x); setShown(40) }}>{t(x)}</button>)}
-    </div>}
+    {groups.length > 0
+      ? <div className="chips lib-mode" style={{ marginBottom: 10 }}>
+        <button className={'chip nocap' + (mine ? ' on' : '')} onClick={() => setMine(true)}>{t('My exercises')}</button>
+        <button className={'chip nocap' + (!mine ? ' on' : '')} onClick={() => setMine(false)}>{t('All')}</button>
+      </div>
+      : <div className="small dim" style={{ margin: '-4px 2px 10px' }}>{t('Exercises from your routines and favourites will show up here. Until then, here is the whole library.')}</div>}
+    {!showMine && <>
+      {profile && <div className="small dim row" style={{ margin: '-4px 2px 10px', gap: 6, alignItems: 'center' }}>
+        <Icon name="kettlebell" style={{ fontSize: 13 }} />
+        {showAll ? t('Showing all equipment') : t('Showing what you have in "{0}"', profile.name)}
+        <button className="chip nocap" style={{ marginInlineStart: 'auto', padding: '3px 10px', fontSize: 12 }} onClick={() => setShowAll(v => !v)}>
+          {showAll ? t('Filter by "{0}"', profile.name) : t('Show all equipment')}
+        </button>
+      </div>}
+      {/* Changing body part keeps the equipment filter (issue #71): the eqOn fallback above drops
+          it only for the current view if the new body part has nothing under it, without forgetting
+          the choice. "All" clears it, since it spans every body part. */}
+      <div className="chips" ref={bpStrip} style={{ marginBottom: eqOpts.length > 1 || catOpts.length > 1 ? 8 : 12 }}>
+        <button className={'chip nocap' + (!bp ? ' on' : '')} onClick={() => { setBp(''); setEq(''); setShown(40) }}>{t('All')}</button>
+        {BODYPARTS.map(b => <button key={b} className={'chip' + (bp === b ? ' on' : '')} onClick={() => { setBp(b); setShown(40) }}>{t(b)}</button>)}
+      </div>
+      {catOpts.length > 1 && <div className="chips" ref={catStrip} style={{ marginBottom: 8 }}>
+        <button className={'chip nocap' + (!catOn ? ' on' : '')} onClick={() => { setCat(''); setShown(40) }}>{t('Any type')}</button>
+        {catOpts.map(x => <button key={x} className={'chip' + (catOn === x ? ' on' : '')} onClick={() => { setCat(x); setShown(40) }}>{t(x)}</button>)}
+      </div>}
+      {eqOpts.length > 1 && <div className="chips" ref={eqStrip} style={{ marginBottom: 12 }}>
+        <button className={'chip nocap' + (!eqOn ? ' on' : '')} onClick={() => { setEq(''); setShown(40) }}>{t('Any equipment')}</button>
+        {eqOpts.map(x => <button key={x} className={'chip' + (eqOn === x ? ' on' : '')} onClick={() => { setEq(x); setShown(40) }}>{t(x)}</button>)}
+      </div>}
+    </>}
     <div className={'list' + (S.exerciseView === 'cards' ? ' ex-grid' : '')}>
       <div className="item ex-new" {...tappable(() => customExSheet(null, ex => exerciseDetailSheet(ex), q.trim()))}>
         <div className="thumb thumb-x"><Icon name="plusCircle" /></div>
         <div className="grow"><div className="tt">{t('Create your own exercise')}</div><div className="ss">{t('name + body part, and a photo or video if you like')}</div></div><Icon name="plus" className="chev" />
       </div>
-      {f.slice(0, shown).map(row)}
-      {f.length === 0 && !similar.length && <div className="empty"><div className="ico"><Icon name="magnifier" /></div>{t('No match')}</div>}
-      {similar.length > 0 && <h4 className="sec similar-label">{f.length ? t('Similar exercises') : t('No exact match. These come close:')}</h4>}
-      {similar.map(row)}
+      {showMine ? groups.map(g => <Fragment key={g.key}>
+        <h4 className="sec lib-group" style={{ margin: '16px 2px 6px', gridColumn: '1/-1' }}>
+          {g.routine ? g.routine.name || t('Routine') : g.fav ? t('Favourites') : t('Your own exercises')}</h4>
+        {g.list.map(row)}
+      </Fragment>) : <>
+        {f.slice(0, shown).map(row)}
+        {f.length === 0 && !similar.length && <div className="empty"><div className="ico"><Icon name="magnifier" /></div>{t('No match')}</div>}
+        {similar.length > 0 && <h4 className="sec similar-label">{f.length ? t('Similar exercises') : t('No exact match. These come close:')}</h4>}
+        {similar.map(row)}
+      </>}
     </div>
-    {f.length > shown && <><div style={{ height: 10 }} /><Button ref={moreRef} onClick={() => setShown(s => s + 40)}>{t('Show more')}</Button></>}
+    {!showMine && f.length > shown && <><div style={{ height: 10 }} /><Button ref={moreRef} onClick={() => setShown(s => s + 40)}>{t('Show more')}</Button></>}
   </>
 }
 

@@ -2235,4 +2235,7 @@ export default {
   'Your sports watch, calling you back.': '你的運動手錶在叫你回來。',
   'Coach wants you back on the bar.': '教練等你回到槓鈴前。',
   'Gentle, for headphones or a quiet room.': '輕柔，適合耳機或安靜的房間。',
+  'My exercises': '我的動作',
+  'Your own exercises': '自訂動作',
+  'Exercises from your routines and favourites will show up here. Until then, here is the whole library.': '你的訓練計畫和最愛中的動作會顯示在這裡。在那之前，這裡顯示完整動作庫。',
 }

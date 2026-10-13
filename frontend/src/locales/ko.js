@@ -2242,4 +2242,7 @@ export default {
   'Your sports watch, calling you back.': '스포츠 시계가 다시 부르고 있어요.',
   'Coach wants you back on the bar.': '코치가 바 앞으로 돌아오래요.',
   'Gentle, for headphones or a quiet room.': '이어폰이나 조용한 곳에 어울려요.',
+  'My exercises': '내 운동',
+  'Your own exercises': '직접 만든 운동',
+  'Exercises from your routines and favourites will show up here. Until then, here is the whole library.': '루틴과 즐겨찾기에 있는 운동이 여기에 표시됩니다. 그 전까지는 전체 라이브러리가 표시됩니다.',
 }

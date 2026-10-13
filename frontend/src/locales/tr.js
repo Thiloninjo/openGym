@@ -2242,4 +2242,7 @@ export default {
   'Your sports watch, calling you back.': 'Spor saatin seni geri çağırıyor.',
   'Coach wants you back on the bar.': 'Koç seni bara geri bekliyor.',
   'Gentle, for headphones or a quiet room.': 'Sakin, kulaklık ya da sessiz bir oda için.',
+  'My exercises': 'Egzersizlerim',
+  'Your own exercises': 'Kendi egzersizlerin',
+  'Exercises from your routines and favourites will show up here. Until then, here is the whole library.': 'Rutinlerindeki ve favorilerindeki egzersizler burada görünecek. O zamana kadar tüm kütüphane burada.',
 }

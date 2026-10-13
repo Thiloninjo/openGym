@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useUI } from '../store/useUI.js'
 import { keyboardOpen } from '../lib/viewport-guard.js'
+import { leaveGhost } from '../lib/thilo-ghost.js'
 
 // Putting the page back after a sheet closes takes up to three goes (see the un-pin below): now,
 // next frame, and once the keyboard's dismiss animation is over. Anything else that wants to
@@ -122,20 +123,24 @@ function Sheet({ sheet }) {
   }, [])
 
   const close = () => closeSheet(sheet.id)
+  // Thilos Fork: beim Schließen gleitet eine Kopie hinaus, das Menü selbst geht sofort zu
+  // (lib/thilo-ghost.js, thilo-motion.css).
+  const wrap = useRef(null)
+  useLayoutEffect(() => { const el = wrap.current; return () => leaveGhost(el) }, [])
   // Full screen, on black: a photo or video opened from a workout (WorkoutMedia.jsx). No
   // backdrop to tap, no drag to dismiss — the viewer has its own close button, and back closes
   // it like any sheet.
   if (sheet.kind === 'viewer') return <div>{sheet.render(close)}</div>
   if (sheet.kind === 'center') {
     return (
-      <div>
+      <div ref={wrap}>
         <div className="mback" onClick={() => { if (!sheet.locked) close() }} />
         <div className="center">{sheet.render(close)}</div>
       </div>
     )
   }
   return (
-    <div>
+    <div ref={wrap}>
       <div className="mback" onClick={() => { if (!sheet.locked) close() }} />
       <div className="sheet" ref={ref} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
         onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>

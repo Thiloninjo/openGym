@@ -35,6 +35,8 @@ function render() {
   return host
 }
 const names = host => [...host.querySelectorAll('.item .tt')].map(el => el.textContent).slice(1)   // drop "Create your own"
+// Favourites, routines or custom exercises switch the page to "My exercises"; these browse the catalogue.
+const browseAll = host => act(() => host.querySelectorAll('.lib-mode .chip')[1].click())
 const cssSource = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
 
 beforeEach(() => {
@@ -50,6 +52,7 @@ describe('Library favourites', () => {
     const fav = [plain[6], plain[2]]
     mocks.S.favEx = fav.map(n => EXDB.find(e => e.n === n).id)
     const host = render()
+    browseAll(host)
     const shown = names(host)
     expect(shown.slice(0, 2)).toEqual(plain.filter(n => fav.includes(n)))
     expect(shown.slice(2)).toEqual(plain.filter(n => !fav.includes(n)))
@@ -78,6 +81,7 @@ describe('Library favourites', () => {
     const legs = EXDB.find(e => e.bp !== 'chest')
     mocks.S.favEx = [chest[4].id, legs.id]
     const host = render()
+    browseAll(host)
     const chip = [...host.querySelectorAll('.chips .chip')].find(b => b.textContent === 'chest')
     act(() => chip.click())
     const shown = names(host)
@@ -183,5 +187,54 @@ describe('Library similar exercises', () => {
     expect(label(host)).toBe('Similar exercises')
     const all = names(host)
     expect(new Set(all).size).toBe(all.length)
+  })
+})
+
+// By default the page lists only your exercises — each routine's in routine order, then the
+// favourites no routine holds, then your own — instead of the whole catalogue. Typing still
+// searches everything, and "All" browses it with the body-part chips.
+describe('Library "My exercises"', () => {
+  const heads = host => [...host.querySelectorAll('.lib-group')].map(el => el.textContent)
+  const search = (host, text) => {
+    const input = host.querySelector('.search input')
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    act(() => { setter.call(input, text); input.dispatchEvent(new Event('input', { bubbles: true })) })
+  }
+  const [a, b, c, d] = EXDB
+  beforeEach(() => {
+    mocks.S.routines = [
+      { id: 'r1', name: 'Push', ex: [{ id: a.id }, { id: b.id }] },
+      { id: 'r2', name: 'Pull', ex: [{ id: c.id }] },
+    ]
+    mocks.S.favEx = [b.id, d.id]
+    mocks.S.customEx = [{ id: 'c1', n: 'my move', bp: 'chest', eq: '', custom: true }]
+  })
+
+  it('groups routines in order, then favourites outside them, then your own', () => {
+    const host = render()
+    expect(heads(host)).toEqual(['Push', 'Pull', 'Favourites', 'Your own exercises'])
+    expect(names(host)).toEqual([a.n, b.n, c.n, d.n, 'my move'])
+    expect(host.querySelector('.chips .chip')?.textContent).toBe('My exercises')
+  })
+
+  it('searches the whole catalogue while typing, and browses it under "All"', () => {
+    const host = render()
+    search(host, 'face pull')
+    expect(heads(host)).toEqual([])
+    expect(names(host).length).toBeGreaterThan(5)
+    search(host, '')
+    expect(heads(host)).toHaveLength(4)
+    browseAll(host)
+    expect(heads(host)).toEqual([])
+    expect(names(host).length).toBeGreaterThan(5)
+    expect([...host.querySelectorAll('.chips .chip')].some(el => el.textContent === 'chest')).toBe(true)
+  })
+
+  it('falls back to the whole library with a hint when nothing is yours yet', () => {
+    mocks.S.routines = []; mocks.S.favEx = []; mocks.S.customEx = []
+    const host = render()
+    expect(host.querySelector('.lib-mode')).toBeNull()
+    expect(host.textContent).toContain('Exercises from your routines and favourites will show up here.')
+    expect(names(host)).toHaveLength(40)
   })
 })

@@ -2253,4 +2253,7 @@ export default {
   'Your sports watch, calling you back.': 'นาฬิกาสปอร์ตเรียกคุณกลับมาแล้ว',
   'Coach wants you back on the bar.': 'โค้ชอยากให้คุณกลับมาที่บาร์',
   'Gentle, for headphones or a quiet room.': 'เบา ๆ สำหรับหูฟังหรือห้องที่เงียบ',
+  'My exercises': 'ท่าของฉัน',
+  'Your own exercises': 'ท่าที่คุณสร้างเอง',
+  'Exercises from your routines and favourites will show up here. Until then, here is the whole library.': 'ท่าจากรูทีนและรายการโปรดของคุณจะแสดงที่นี่ ระหว่างนี้จะแสดงคลังท่าทั้งหมด',
 }
