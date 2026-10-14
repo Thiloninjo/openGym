@@ -41,7 +41,7 @@ workflows:
           cd frontend
           npm ci --ignore-scripts
           npm run build:mobile
-      - name: Pausen-Baustein und Live-Aktivität ins Xcode-Projekt eintragen
+      - name: Plugins, Training live und Widget ins Xcode-Projekt eintragen
         script: |
           set -e
           if ! ruby -e 'require "xcodeproj"' 2>/dev/null; then
