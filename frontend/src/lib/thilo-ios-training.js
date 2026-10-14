@@ -57,7 +57,8 @@ export function trainingSnapshot(active, nameOf) {
   const done = sets.filter(s => s?.done).length
   return {
     name: String(active.name || ''),
-    startedAt: Number(active.start) || Date.now(),
+    // Ohne Startzeit null, nicht Date.now(): das Bild dient auch als Vergleichsschlüssel.
+    startedAt: Number(active.start) || null,
     exercise: e ? String(nameOf(e.id) || '') : '',
     setNo: Math.min(done + 1, sets.length),
     setCount: sets.length,
@@ -76,7 +77,8 @@ export function watchTraining(store, { nameOf }) {
     const k = snap && JSON.stringify(snap)
     if (k === key) return
     if (!snap) call('end')
-    else call(last ? 'update' : 'start', snap)
+    // Neue Startzeit heißt neues Training: start, damit die Live-Aktivität neu beginnt.
+    else call(last && last.startedAt === snap.startedAt ? 'update' : 'start', snap)
     last = snap
     key = k
   })

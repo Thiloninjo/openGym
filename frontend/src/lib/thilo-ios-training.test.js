@@ -73,6 +73,12 @@ describe('trainingSnapshot', () => {
     expect(trainingSnapshot(workout({ backfill: { durationMin: 60 } }), nameOf)).toBeNull()
     expect(trainingSnapshot(workout({ editingWorkoutId: 'x' }), nameOf)).toBeNull()
   })
+  it('ohne Startzeit kein Date.now() im Bild (der Vergleichsschlüssel bliebe sonst nie gleich)', async () => {
+    const { trainingSnapshot } = await load()
+    const A = workout({ start: undefined })
+    expect(trainingSnapshot(A, nameOf).startedAt).toBeNull()
+    expect(trainingSnapshot(A, nameOf)).toEqual(trainingSnapshot(A, nameOf))
+  })
   it('hält ein leeres Training aus', async () => {
     const { trainingSnapshot } = await load()
     expect(trainingSnapshot(workout({ entries: [] }), nameOf)).toMatchObject({ exercise: '', setNo: 0, setCount: 0 })
@@ -118,6 +124,16 @@ describe('watchTraining', () => {
     st.setState({ S: { active: null, sound: true } })
     await settle()
     expect(h.calls[3]).toEqual(['end', {}])
+  })
+
+  it('neue Startzeit (anderes Training ohne Ende dazwischen) schickt start statt update', async () => {
+    const { watchTraining } = await load()
+    const st = store({ active: workout() })
+    watchTraining(st, { nameOf })
+    st.setState({ S: { active: workout({ start: 1_700_000_500_000 }) } })
+    await settle()
+    expect(methods()).toEqual(['start', 'start'])
+    expect(h.calls[1][1]).toMatchObject({ startedAt: 1_700_000_500_000 })
   })
 
   it('ein laufendes Training beim App-Start (nach Neustart) startet die Aktivität wieder', async () => {
