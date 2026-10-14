@@ -182,6 +182,88 @@ test('rev < since → Merker auf 0, alles neu holen', async () => {
   assert.ok(h.logs.some(l => /neu aufgebaut/.test(l)));
 });
 
+test('Probe wandert auf einen anderen Tag → alter Tag neu berechnet (weg, mit Löschvermerk)', async () => {
+  const now = 1_800_000_000_000;
+  const h = harness({ now: () => now });
+  h.push(W('a', '2026-10-14T05:00:00Z', 80));
+  await h.sync.sync();
+  const t = day(h, '2026-10-14').t;
+  h.push(W('a', '2026-10-15T05:00:00Z', 80));   // Zeit in Apple Health korrigiert
+  await h.sync.sync();
+  assert.equal(day(h, '2026-10-14'), undefined);
+  assert.equal(h.state.deleted.bodyweight['2026-10-14'], Math.max(now, t + 1));
+  assert.equal(day(h, '2026-10-15').hk, 'a');
+});
+
+test('Neuaufbau der habits-api: sie ist die Wahrheit, verschwundene Tage fallen weg', async () => {
+  const now = 1_800_000_000_000;
+  const h = harness({ now: () => now, state: { unit: 'kg', bodyweight: [{ d: '2026-10-11', w: 90, t: 1 }] } });
+  h.push(W('x', '2026-10-12T05:00:00Z', 82));
+  h.push(W('a', '2026-10-14T05:00:00Z', 80));
+  h.push(W('y', '2026-10-13T05:00:00Z', 81));
+  await h.sync.sync();
+  const rev0 = h.state._rev;
+  // neu aufgebaut: nur noch a (unverändert) und b; x und y sind fort
+  h.feed = []; h.rev = 0;
+  h.push(W('a', '2026-10-14T05:00:00Z', 80));
+  h.push(W('b', '2026-10-15T05:00:00Z', 79));
+  await h.sync.sync();
+  assert.deepEqual(h.calls, [0, 3, 0]);
+  assert.deepEqual(h.state.bodyweight.map(e => [e.d, e.w]), [['2026-10-11', 90], ['2026-10-14', 80], ['2026-10-15', 79]]);
+  assert.ok(h.state.deleted.bodyweight['2026-10-12'] >= now);
+  assert.ok(h.state.deleted.bodyweight['2026-10-13'] >= now);
+  assert.equal(h.state.deleted.bodyweight['2026-10-14'], undefined);
+  assert.deepEqual(Object.keys(h.mirror.weights).sort(), ['a', 'b']);
+  assert.equal(h.mirror.rev, 2);
+  assert.equal(h.state._rev, rev0 + 1);
+});
+
+test('kaputter Spiegel: unbrauchbare Einträge fallen weg, rev ganzzahlig und ≥ 0, kein Absturz', async () => {
+  for (const [rev, since] of [['3.7', 3], [-5, 0], [Infinity, 0], ['x', 0], [null, 0]]) {
+    const h = harness();
+    h.mirror = { rev, weights: { n: null, q: { at: 'kein Datum', kg: 80 }, r: { at: '2026-10-13T05:00:00Z', kg: 'x' }, s: 5,
+      ok: { at: '2026-10-12T05:00:00Z', kg: 82, deleted: false } } };
+    h.rev = 10;
+    h.feed = [{ ...W('a', '2026-10-14T05:00:00Z', 80), rev: 10 }];
+    await h.sync.sync();
+    assert.equal(h.calls[0], since);
+    assert.deepEqual(Object.keys(h.mirror.weights).sort(), ['a', 'ok']);
+    assert.equal(day(h, '2026-10-14').w, 80);
+  }
+  const h = harness();
+  h.mirror = 'Unsinn';
+  h.push(W('a', '2026-10-14T05:00:00Z', 80));
+  await h.sync.sync();
+  assert.equal(day(h, '2026-10-14').w, 80);
+});
+
+test('Antwort ohne ganzzahlige rev ist ein Fehler: Logzeile, nichts geschrieben', async () => {
+  for (const rev of [undefined, '3', 2.5, NaN, -1]) {
+    const h = harness();
+    const sync = createHealthSync({
+      uid: 'u1', fetchBody: async () => ({ rev, items: [W('a', '2026-10-14T05:00:00Z', 80)] }),
+      readState: () => clone(h.state), commit: () => { throw new Error('darf nicht schreiben'); },
+      loadMirror: () => null, saveMirror: m => { h.mirror = m; }, log: (...a) => h.logs.push(a.join(' ')),
+    });
+    await sync.sync();
+    assert.equal(h.mirror, null);
+    assert.ok(h.logs.some(l => /rev/.test(l)), `rev=${rev}`);
+  }
+});
+
+test('keine abgelehnte Promise, auch wenn eine Probe beim Lesen wirft', async () => {
+  const h = harness();
+  const bad = { get type() { throw new Error('Getter kaputt'); } };
+  const sync = createHealthSync({
+    uid: 'u1', fetchBody: async () => ({ rev: 1, items: [bad] }),
+    readState: () => clone(h.state), commit: () => {}, loadMirror: () => null,
+    saveMirror: m => { h.mirror = m; }, log: (...a) => h.logs.push(a.join(' ')),
+  });
+  await sync.sync();   // wirft nicht
+  assert.equal(h.mirror, null);
+  assert.ok(h.logs.some(l => /Getter kaputt/.test(l)));
+});
+
 test('ungültige Werte werden übersprungen und geloggt', async () => {
   const h = harness();
   h.push(W('a', '2026-10-14T05:00:00Z', 'achtzig'));

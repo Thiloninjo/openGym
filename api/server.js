@@ -1989,8 +1989,9 @@ const HEALTH = HEALTH_CFG.ok ? (() => {
 console.log(HEALTH ? `thilo-health: an (Nutzer ${HEALTH_CFG.uid})` : `thilo-health: aus (${HEALTH_CFG.reason})`);
 const HEALTH_EVERY_MS = 15 * 60000;
 if (HEALTH) {
-  HEALTH.sync();
-  setInterval(() => HEALTH.sync(), HEALTH_EVERY_MS).unref();
+  const runHealth = () => HEALTH.sync().catch(e => console.error('thilo-health', e));
+  runHealth();
+  setInterval(runHealth, HEALTH_EVERY_MS).unref();
 }
 async function healthHook(req, res, url) {
   if (!HEALTH || req.method !== 'POST') return json(res, 404, { error: 'not found' });

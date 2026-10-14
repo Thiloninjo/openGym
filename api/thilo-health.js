@@ -123,6 +123,27 @@ export function applyDays(state, mirror, days, now = Date.now()) {
   return changed;
 }
 
+// Der geladene Spiegel, bereinigt: `rev` ganzzahlig und ≥ 0, nur Proben mit lesbarem `at` und
+// endlichem `kg` (eine kaputte Datei darf den Abgleich nicht abbrechen).
+function cleanMirror(loaded) {
+  const n = isMap(loaded) ? Number(loaded.rev) : NaN;
+  const rev = Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0;
+  const weights = {};
+  if (isMap(loaded) && isMap(loaded.weights)) {
+    for (const [uuid, p] of Object.entries(loaded.weights)) {
+      if (!isMap(p) || typeof p.at !== 'string' || !Number.isFinite(Date.parse(p.at))) continue;
+      if (typeof p.kg !== 'number' || !Number.isFinite(p.kg)) continue;
+      weights[uuid] = { at: p.at, kg: p.kg, deleted: p.deleted === true };
+    }
+  }
+  return { rev, weights };
+}
+// Eine Antwort der habits-api braucht eine ganzzahlige `rev` ≥ 0, sonst ist sie ein Fehler.
+function checked(body) {
+  if (!isMap(body) || !Number.isInteger(body.rev) || body.rev < 0) throw new Error('habits-api: Antwort ohne gültige rev');
+  return body;
+}
+
 /**
  * Der Abgleich. `fetchBody(since)` → `{rev, items}`; `readState(uid)` liefert den gespeicherten
  * Zustand (wirft, wenn er nicht lesbar ist); `commit(uid, cur, next)` schreibt über den Weg von
@@ -131,21 +152,24 @@ export function applyDays(state, mirror, days, now = Date.now()) {
  */
 export function createHealthSync({ uid, fetchBody, readState, commit, loadMirror, saveMirror, log = console.log, now = Date.now }) {
   async function once() {
-    const loaded = loadMirror();
-    const mirror = isMap(loaded) ? { rev: Number(loaded.rev) || 0, weights: isMap(loaded.weights) ? loaded.weights : {} } : { rev: 0, weights: {} };
-    let body;
+    let mirror, body;
+    const days = new Set();
     try {
-      body = await fetchBody(mirror.rev);
-      if ((Number(body.rev) || 0) < mirror.rev) {
+      mirror = cleanMirror(loadMirror());
+      body = checked(await fetchBody(mirror.rev));
+      if (body.rev < mirror.rev) {
+        // Neu aufgebaut: die habits-api ist die Wahrheit. Der Spiegel beginnt leer, und jeder Tag
+        // aus dem alten Spiegel wird neu berechnet, damit verschwundene Proben ihren Eintrag verlieren.
         log(`thilo-health: habits-api neu aufgebaut (rev ${body.rev} < ${mirror.rev}), hole alles neu`);
-        mirror.rev = 0;
-        body = await fetchBody(0);
+        for (const p of Object.values(mirror.weights)) days.add(berlinDay(Date.parse(p.at)));
+        mirror = { rev: 0, weights: {} };
+        body = checked(await fetchBody(0));
       }
+      for (const d of absorb(mirror, Array.isArray(body.items) ? body.items : [], log)) days.add(d);
     } catch (e) {
       log(`thilo-health: Abruf fehlgeschlagen: ${e?.message || e}`);
       return;
     }
-    const days = absorb(mirror, Array.isArray(body.items) ? body.items : [], log);
     // Ab hier synchron: lesen, ändern, schreiben.
     try {
       if (days.size) {
@@ -154,7 +178,7 @@ export function createHealthSync({ uid, fetchBody, readState, commit, loadMirror
         const next = clone(cur);
         if (applyDays(next, mirror, days, now())) commit(uid, cur, next);
       }
-      mirror.rev = Math.max(mirror.rev, Number(body.rev) || 0);
+      mirror.rev = Math.max(mirror.rev, body.rev);
       saveMirror(mirror);
     } catch (e) {
       log(`thilo-health: Schreiben fehlgeschlagen: ${e?.message || e}`);
