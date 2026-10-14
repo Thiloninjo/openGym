@@ -34,9 +34,13 @@ Neue Datei `api/thilo-health.js`, eingebunden in `api/server.js` mit Kommentar �
 - **Abgleich `sync()`**: Merker `rev` aus dem Spiegel, `GET /api/body?since=rev`, Gewichtseinträge in den
   Spiegel übernehmen (ungültige Werte überspringen und loggen), betroffene Tage sammeln (Tag = lokales Datum
   Europe/Berlin von `at`). Für jeden betroffenen Tag die letzte nicht gelöschte Probe bestimmen:
-  - vorhanden → Eintrag `{d, w, t: Date.parse(at), src: "apple-health", hk: uuid}` setzen (ersetzt den Tageseintrag),
+  - vorhanden → Eintrag `{d, w, t, src: "apple-health", hk: uuid}` setzen (ersetzt den Tageseintrag),
     `w` in `S.unit` (kg, bei `lb` umrechnen wie `frontend/src/lib/import-csv.js`), auf 0,1 gerundet;
-  - keine mehr → Tageseintrag entfernen, aber nur wenn er `src: "apple-health"` trägt (alte Handeinträge bleiben).
+    `t` ist bei einem neuen Tag `Date.parse(at)`, beim Ersetzen eines gespeicherten Eintrags
+    `max(Date.parse(at), gespeichertes t + 1)`, damit der App-Merge (pro Tag gewinnt das spätere `t`) die alte Kopie eines Geräts nicht zurückholt;
+  - keine mehr → Tageseintrag entfernen, aber nur wenn er `src: "apple-health"` trägt (alte Handeinträge bleiben),
+    und die Löschung selbst vermerken: `deleted.bodyweight[d] = max(Date.now(), gespeichertes t + 1)`
+    (geschrieben wird mit `stamped: true`, das vermerkt Löschungen nicht von selbst).
   Liste nach `d` sortieren. Geschrieben wird über denselben Weg wie `PUT /api/data`
   (`readStateStrict`, `stampPut`, `_rev`/`_wid`/`_wids`, `atomicWrite`, `stateCache.delete`) – dafür eine Hilfsfunktion
   aus dem PUT-Handler herausziehen, damit beide denselben Code nutzen. Zwischen Lesen und Schreiben kein `await`.
