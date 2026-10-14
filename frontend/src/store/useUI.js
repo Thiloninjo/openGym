@@ -3,11 +3,12 @@ import { uid } from '../lib/format.js'
 import { beep, chime, vibrate, alertBuzz } from '../lib/sound.js'
 import { restSoundOf } from '../lib/rest-sounds.js'
 import { api } from '../lib/api.js'
-import { t } from '../lib/i18n.js'
+import { t, getLang, exerciseNameFor } from '../lib/i18n.js'
 import { deviceId } from '../lib/push.js'
 import { MOBILE } from '../lib/mobile.js'
 import { armRestAlert, bindNativeRest, disarmRestAlert, holdRestAlert, toneNative } from '../lib/rest-alert.js'
-import { iosRestHold, iosRestStart, iosRestStop } from '../lib/thilo-ios-rest.js'
+import { iosRestHold, iosRestStart, iosRestStop, iosSpeaksRestEnd, watchTraining } from '../lib/thilo-ios-training.js'
+import { exOr } from '../lib/exercises.js'
 import { useStore } from './useStore.js'
 import { REST_MAX } from '../lib/duration.js'
 import { accentValue } from '../lib/accent.js'
@@ -28,8 +29,8 @@ const bookRestEnd = (endsAt, totalSec, kind) => {
   const switching = kind === 'switch'
   if (!MOBILE) { if (!switching) pushRestTimer(Math.max(1, Math.round((endsAt - Date.now()) / 1000))); return }
   const { S } = useStore.getState()
-  // Thilos Fork: iPhone-App, Ton bei gesperrtem Bildschirm und Countdown auf dem Sperrbildschirm.
-  iosRestStart(endsAt, { totalSec, title: switching ? t('Switch sides') : t('Rest'), doneTitle: switching ? t('Switch sides') : t('Rest’s over. Next set!'), sound: S.sound })
+  // Thilos Fork: iPhone-App, Ansage zum Pausenende (auch gesperrt) und Countdown in der Live-Aktivität.
+  iosRestStart(endsAt, { totalSec, title: switching ? t('Switch sides') : t('Rest'), doneTitle: switching ? t('Switch sides') : t('Rest’s over. Next set!'), sound: S.sound, lang: getLang() })
   armRestAlert(endsAt, { title: switching ? t('Switch sides') : t('Rest’s over. Next set!'), countdownTitle: switching ? t('Switch sides') : t('Rest'), totalSec, accent: accentValue(S), sound: !!S.sound, classic: restSoundOf(S) === 'classic', tone: restSoundOf(S), vibrate: S.vibrate !== false, alarmBuzz: S.vibrate !== false && !!S.vibrateOnSilent })
     .then(ok => {
       // Only for the rest that asked: one skipped or moved since then has booked its own end.
@@ -177,7 +178,8 @@ const runRest = (set, get) => {
     if (left <= 0 && tm.kind === 'switch') {
       // Over like a hold is: the chime and its buzz, then the bar goes. No "Ready", no toast:
       // the other side is the next thing, one tap away.
-      if (seenLive) { endTone(snd, endSound); alertBuzz([200, 100, 200]); get().flashTimer() }
+      // Thilos Fork: in der iPhone-App sagt die App das Ende an, die Seite bleibt stumm.
+      if (seenLive) { if (!iosSpeaksRestEnd()) endTone(snd, endSound); alertBuzz([200, 100, 200]); get().flashTimer() }
       stopRestTicking()
       set({ timer: null })
       return
@@ -186,7 +188,8 @@ const runRest = (set, get) => {
       if (seenLive) {
         // The Android alarm for this end stays quiet while the app is on screen, so this chime is
         // the only one. Locked, this branch never runs and the alarm's tone does.
-        endTone(snd, endSound)
+        // Thilos Fork: in der iPhone-App sagt die App das Ende an, die Seite bleibt stumm.
+        if (!iosSpeaksRestEnd()) endTone(snd, endSound)
         alertBuzz([200, 100, 200]); get().flashTimer()
       }
       // The toast stays even when the rest ran out while the app was hidden: a guest, or anyone
@@ -492,6 +495,8 @@ export function restoreRest(now = Date.now()) {
   return true
 }
 useUI.subscribe((s, prev) => { if (s.timer !== prev.timer) saveRest(s.timer) })
+// Thilos Fork: das laufende Training als Live-Aktivität in der iPhone-App (lib/thilo-ios-training.js).
+watchTraining(useStore, { nameOf: id => exerciseNameFor(exOr(id)) })
 restoreRest()
 
 // The hold (a timed set) the same way: a reload or the app being killed mid-plank used to drop
