@@ -454,6 +454,7 @@ export default {
   'Weigh in before workouts': '운동 전 체중 기록',
   'Asks for your body weight when a workout starts. Off starts the session straight away.': '운동을 시작할 때 체중을 물어봅니다. 끄면 세션이 바로 시작됩니다.',
   'No weigh-ins yet. Log your weight to start the curve.': '아직 체중 기록이 없어요. 체중을 기록하면 그래프가 시작돼요.',
+  'Comes automatically from Apple Health': 'Apple 건강에서 자동으로 들어와요',
   'Music playing on this phone stops during a workout and does not resume by itself.': '운동 중에는 이 휴대폰에서 재생 중인 음악이 멈추며, 자동으로 다시 재생되지 않습니다.',
   'The quieter three-beep sound from before 1.3.9, instead of the louder chime.': '더 큰 차임벨 대신 1.3.9 이전의 더 조용한 세 번의 비프음을 사용합니다.',
   'Sounds': '소리',

@@ -5,7 +5,7 @@ import { exOr } from '../lib/exercises.js'
 import { t, exerciseNameFor, exerciseNameClass } from '../lib/i18n.js'
 import Icon from '../components/Icon.jsx'
 import { Button, Segmented } from '../components/ui.jsx'
-import { exercisePicker, bwSheet } from '../sheets.jsx'
+import { exercisePicker } from '../sheets.jsx'
 import { computeBalance, overrideKey, withOverride } from '../lib/structuralBalance.js'
 import { balanceStatusView } from '../lib/structuralBalance-view.js'
 import { TEMPLATES, TEMPLATE_LIST, DEFAULT_TEMPLATE_ID, EVALUATION_MODES } from '../lib/structuralBalanceTemplates.js'
@@ -74,7 +74,7 @@ export default function StructuralBalance() {
                   <span className={exId ? exerciseNameClass(exOr(exId)) : ''} data-exercise-name>{name}</span>{r.isOverridden ? ` · ${t('Custom')}` : ''}
                 </span>
                 {r.needsBodyweight && <span className="small" data-needs-bodyweight style={{ display: 'block', color: 'var(--label-2)' }}>
-                  {t('Log your body weight to score this lift.')}
+                  {/* Thilos Fork */ t('Comes automatically from Apple Health')}
                 </span>}
                 {r.needsAnchor && <span className="small" data-needs-anchor style={{ display: 'block', color: 'var(--label-2)' }}>
                   {t('Log the anchor lift to score this one.')}
@@ -86,7 +86,7 @@ export default function StructuralBalance() {
               </span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {r.needsBodyweight && <Button size="sm" variant="ghost" icon="plus" onClick={() => bwSheet()}>{t('Log body weight')}</Button>}
+              {/* Thilos Fork: kein "Log body weight"-Knopf, Gewicht kommt aus Apple Health */}
               <Button size="sm" variant="ghost" icon="pencil" onClick={() => changeExercise(role)}>{t('Change exercise')}</Button>
               {r.isOverridden && <Button size="sm" variant="ghost" onClick={() => clearOverride(role)}>{t('Use default exercise')}</Button>}
             </div>

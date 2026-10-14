@@ -483,6 +483,7 @@ export default {
   'Weigh in before workouts': 'ওয়ার্কআউটের আগে ওজন মাপুন',
   'Asks for your body weight when a workout starts. Off starts the session straight away.': 'ওয়ার্কআউট শুরু হলে আপনার শরীরের ওজন জিজ্ঞেস করে। বন্ধ থাকলে সেশন সরাসরি শুরু হয়।',
   'No weigh-ins yet. Log your weight to start the curve.': 'এখনও কোনো ওজন মাপা নেই। গ্রাফ শুরু করতে আপনার ওজন লগ করুন।',
+  'Comes automatically from Apple Health': 'Apple Health থেকে স্বয়ংক্রিয়ভাবে আসে',
   'Music playing on this phone stops during a workout and does not resume by itself.': 'ওয়ার্কআউট চলাকালীন এই ফোনে চলা গান থেমে যায় এবং নিজে থেকে আবার চালু হয় না।',
   'The quieter three-beep sound from before 1.3.9, instead of the louder chime.': '1.3.9-এর আগের নরম তিন-বিপের শব্দ, জোরালো চাইমের বদলে।',
   'Data': 'ডেটা',

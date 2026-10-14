@@ -61,14 +61,15 @@ describe('WorkoutDetail — repeat today', () => {
     expect(useUI.getState().toastMsg).toMatch(/1 exercise no longer exists/)
   })
 
-  it('asks for the weigh-in first when that is on', () => {
+  it('never asks for the weigh-in, even when the old setting is on (Thilos Fork)', () => {
     const saved = workout()
     useStore.setState(s => ({ S: { ...s.S, workouts: [saved], weighIn: true } }))
     const host = (workoutDetailSheet(saved), renderTop())
     act(() => { button(host, 'Repeat today').click() })
-    expect(useStore.getState().S.active).toBeNull()
-    expect(useUI.getState().sheets.length).toBe(1)
-    expect(navigated).toBeNull()
+    expect(useStore.getState().S.active).not.toBeNull()
+    expect(useStore.getState().S.active.bw).toBeNull()
+    expect(useUI.getState().sheets.length).toBe(0)
+    expect(navigated).toBe('/workout')
   })
 
   it('is disabled while a workout is running', () => {

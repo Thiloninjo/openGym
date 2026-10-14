@@ -51,49 +51,14 @@ describe('weigh-ins sheet', () => {
     expect(weeks[0].textContent).toContain('Average 79.7 kg')
     expect(weeks[0].textContent).toContain('0.8')             // down from 80.5 the week before
     expect(weeks[1].textContent).toContain('Average 80.5 kg')
-    expect(weeks[0].querySelectorAll('button[aria-label="Delete weigh-in"]')).toHaveLength(3)
-    expect(weeks[1].querySelectorAll('button[aria-label="Delete weigh-in"]')).toHaveLength(2)
+    // Thilos Fork: Löschen nur in Apple Health, kein Papierkorb-Knopf
+    expect(host.querySelectorAll('button[aria-label="Delete weigh-in"]')).toHaveLength(0)
   })
 
   it('follows a Sunday week start', () => {
     install({ weekStart: 0 })
     weighInsSheet()
     expect([...mountTopSheet().querySelectorAll('[data-week]')].map(w => w.dataset.week)).toEqual(['2026-09-13', '2026-09-06', '2026-08-30'])
-  })
-
-  // The list is months of history scrolled on a phone: a stray tap on a trash button there must
-  // not take a past weigh-in with it, so the list asks first.
-  it('deletes a weigh-in from the list once that is confirmed', () => {
-    weighInsSheet()
-    const host = mountTopSheet()
-    act(() => { host.querySelector('[data-week="2026-08-31"] button[aria-label="Delete weigh-in"]').click() })
-    expect(useStore.getState().S.bodyweight).toHaveLength(5)
-    expect(useUI.getState().sheets).toHaveLength(2)
-    const ask = mountTopSheet()
-    expect(ask.querySelector('h3').textContent).toBe('Delete weigh-in?')
-    expect(ask.textContent).toContain('80 kg')
-    act(() => { button(ask, 'Delete').click() })
-    expect(useStore.getState().S.bodyweight.map(b => b.d)).toEqual(['2026-09-01', '2026-09-07', '2026-09-09', '2026-09-13'])
-    expect(host.textContent).toContain('4 weigh-ins')
-  })
-
-  it('keeps the weigh-in when the question is cancelled', () => {
-    weighInsSheet()
-    const host = mountTopSheet()
-    act(() => { host.querySelector('[data-week="2026-08-31"] button[aria-label="Delete weigh-in"]').click() })
-    const ask = mountTopSheet()
-    act(() => { button(ask, 'Cancel').click() })
-    expect(useUI.getState().sheets).toHaveLength(1)
-    expect(useStore.getState().S.bodyweight).toHaveLength(5)
-  })
-
-  // The log sheet's recent three are the ones just typed: a typo there still goes in one tap.
-  it('still deletes one of the log sheet\'s recent weigh-ins in one tap', () => {
-    bwSheet()
-    const log = mountTopSheet()
-    act(() => { log.querySelector('button[aria-label="Delete weigh-in"]').click() })
-    expect(useUI.getState().sheets).toHaveLength(1)
-    expect(useStore.getState().S.bodyweight).toHaveLength(4)
   })
 
   it('has an empty state', () => {
@@ -107,7 +72,7 @@ describe('weigh-ins sheet', () => {
   it('is reached from the log sheet once there are more weigh-ins than its recent three', () => {
     bwSheet()
     const log = mountTopSheet()
-    expect(log.querySelectorAll('button[aria-label="Delete weigh-in"]')).toHaveLength(3)
+    expect(log.querySelectorAll('button[aria-label="Delete weigh-in"]')).toHaveLength(0)
     const all = button(log, 'All weigh-ins')
     expect(all).toBeTruthy()
     act(() => { all.click() })

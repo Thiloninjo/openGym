@@ -454,6 +454,7 @@ export default {
   'Weigh in before workouts': '训练前称重',
   'Asks for your body weight when a workout starts. Off starts the session straight away.': '开始训练时询问体重。关闭后直接进入训练。',
   'No weigh-ins yet. Log your weight to start the curve.': '还没有称重记录。记一下体重，曲线就开始了。',
+  'Comes automatically from Apple Health': '自动来自 Apple 健康',
   'Music playing on this phone stops during a workout and does not resume by itself.': '锻炼期间，这部手机正在播放的音乐会停止，且不会自动恢复。',
   'The quieter three-beep sound from before 1.3.9, instead of the louder chime.': '使用 1.3.9 版本之前更轻柔的三声提示音，而不是更响亮的铃声。',
   'Sounds': '声音',

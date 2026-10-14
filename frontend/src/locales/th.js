@@ -898,6 +898,7 @@ export default {
   'Weigh in before workouts': 'ชั่งน้ำหนักก่อนออกกำลังกาย',
   'Asks for your body weight when a workout starts. Off starts the session straight away.': 'ถามน้ำหนักตัวเมื่อเริ่มออกกำลังกาย ถ้าปิด เซสชันจะเริ่มทันที',
   'No weigh-ins yet. Log your weight to start the curve.': 'ยังไม่มีการชั่งน้ำหนัก บันทึกน้ำหนักเพื่อเริ่มกราฟได้เลย',
+  'Comes automatically from Apple Health': 'มาจาก Apple Health โดยอัตโนมัติ',
   'Music playing on this phone stops during a workout and does not resume by itself.': 'เพลงที่เล่นอยู่บนโทรศัพท์นี้จะหยุดระหว่างการออกกำลังกาย และจะไม่เล่นต่อเอง',
   'The quieter three-beep sound from before 1.3.9, instead of the louder chime.': 'เสียงบี๊บสามครั้งที่เบากว่าแบบก่อนเวอร์ชัน 1.3.9 แทนเสียงกริ่งที่ดังกว่า',
   'Import from Hevy': 'นำเข้าจาก Hevy',

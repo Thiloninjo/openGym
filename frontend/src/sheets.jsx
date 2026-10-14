@@ -361,7 +361,8 @@ function WeighInRow({ b, unit, confirm = false }) {
   return <div className="row between" style={{ padding: '9px 2px', borderBottom: '1px solid var(--sep)' }}>
     <span className="small muted">{fmtDate(b.d, true)}</span>
     <span className="row" style={{ gap: 12 }}><b>{fmtNum(b.w)} {unit}</b>
-      <button className="iconbtn" style={{ width: 32, height: 30, borderRadius: 8, fontSize: 15, color: 'var(--red)' }} onClick={confirm ? ask : delEntry} aria-label={t('Delete weigh-in')}><Icon name="trash" /></button></span>
+      {/* Thilos Fork: Löschen nur in Apple Health, kein Papierkorb-Knopf */}
+    </span>
   </div>
 }
 
@@ -379,7 +380,7 @@ function WeighIns() {
   const n = weeks.reduce((sum, w) => sum + w.n, 0)
   if (!n) return <>
     <h3>{t('Weigh-ins')}</h3>
-    <div className="empty"><div className="ico"><Icon name="scale" /></div>{t('No weigh-ins yet. Log your weight to start the curve.')}</div>
+    <div className="empty"><div className="ico"><Icon name="scale" /></div>{/* Thilos Fork */ t('Comes automatically from Apple Health')}</div>
   </>
   return <>
     <h3 style={{ marginBottom: 2 }}>{t('Weigh-ins')}</h3>
@@ -2770,8 +2771,8 @@ export function DayNoteRow({ iso, note }) {
 export function startFlow(routineIds) {
   // The weigh-in is a setting (Settings → During a workout, issue #137): off goes straight
   // into the session with no body weight on it, same as "Start without weighing in".
-  if (S().weighIn === false) { beginWorkout(routineIds, null); return }
-  bwSheet({ required: true, onDone: bw => beginWorkout(routineIds, bw) })
+  // Thilos Fork: nie nach dem Gewicht fragen (kommt aus Apple Health), egal was S.weighIn sagt.
+  beginWorkout(routineIds, null)
 }
 export function beginWorkout(routineIds, bw) {
   const st = S()
@@ -2814,9 +2815,8 @@ export function repeatWorkout(w, close) {
     if (close) closeThenNav(close, '/workout'); else navToWorkout()
     if (skipped) toast(tn('{0} exercise no longer exists and was left out.', '{0} exercises no longer exist and were left out.', skipped))
   }
-  if (st.weighIn === false) { go(null); return }
-  if (close) close()
-  bwSheet({ required: true, onDone: go })
+  // Thilos Fork: nie nach dem Gewicht fragen (kommt aus Apple Health), egal was S.weighIn sagt.
+  go(null)
 }
 
 /* ============================ log a past workout ============================ */

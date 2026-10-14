@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore.js'
 import { effectiveRoutines, effectiveRoutineIds, nextTrainingDay, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
 import { fmtNum, fmtDate, todayISO, isoOf, weekStartOf, weekDayOffset, DAYS, DAYN } from '../lib/format.js'
 import { t, tn, dateLocale } from '../lib/i18n.js'
-import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, starterPlanSheet, bwDeltaColor, weighInsSheet } from '../sheets.jsx'
+import { goalSheet, dayOverrideSheet, calendarSheet, startFlow, starterPlanSheet, bwDeltaColor, weighInsSheet } from '../sheets.jsx'
 import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
 import QueueRow from '../components/QueueRow.jsx'
@@ -192,7 +192,7 @@ export default function Home() {
         <h2 style={{ margin: 0 }}>{t('Body weight')}</h2>
         <div className="row" style={{ gap: 8 }}>
           <Button size="sm" icon="target" style={S.targetW ? { color: 'var(--yellow)' } : undefined} onClick={goalSheet}>{S.targetW ? fmtNum(S.targetW) : t('Goal')}</Button>
-          <Button size="sm" icon="plus" onClick={() => bwSheet()}>{t('Log')}</Button>
+          {/* Thilos Fork: Gewicht kommt automatisch aus Apple Health, kein Log-Knopf */}
         </div>
       </div>
       {bw ? <>
@@ -218,9 +218,7 @@ export default function Home() {
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: 4 }}>
           <Button size="sm" variant="ghost" trailingIcon="chevronRight" onClick={weighInsSheet}>{t('All weigh-ins')}</Button>
         </div>
-      </> : <div className="muted small">{S.weighIn === false
-        ? t('No weigh-ins yet. Log your weight to start the curve.')
-        : t("No weigh-ins yet. Log your weight to start the curve (we also ask before every workout).")}</div>}
+      </> : <div className="muted small">{/* Thilos Fork */ t('Comes automatically from Apple Health')}</div>}
     </div>}
 
     <div className="card tappable" style={{ cursor: 'pointer' }} {...tappable(() => calendarSheet())}>

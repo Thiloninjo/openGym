@@ -129,15 +129,10 @@ describe('StructuralBalance view', () => {
     const host = render()
     const rdl = host.querySelector('[data-role-id="romanianDeadlift"]')
     expect(rdl.dataset.status).toBe('no-data')
-    expect(rdl.textContent).toContain('Log your body weight to score this lift.')
+    expect(rdl.textContent).toContain('Comes automatically from Apple Health')
     expect(host.querySelector('[data-role-id="goodMorning"] [data-needs-bodyweight]')).toBe(null)
-    const log = [...rdl.querySelectorAll('button')].find(b => b.textContent.includes('Log body weight'))
-    // Two buttons side by side squeeze each other's labels onto two lines at 360 px (Hungarian):
-    // the row wraps them instead.
-    expect(log.parentElement.style.flexWrap).toBe('wrap')
-    act(() => log.click())
-    expect(useUI.getState().sheets.length).toBe(1)
-
+    // Thilos Fork: no "Log body weight" button, the weight comes from Apple Health
+    expect([...rdl.querySelectorAll('button')].some(b => b.textContent.includes('Log body weight'))).toBe(false)
     act(() => useStore.getState().update(s => { s.bodyweight.push({ d: '2026-01-01', w: 80, t: 1 }) }))
     const scored = host.querySelector('[data-role-id="romanianDeadlift"]')
     expect(scored.dataset.status).toBe('balanced')

@@ -890,6 +890,7 @@ export default {
   'Weigh in before workouts': 'Súlymérés edzés előtt',
   'Asks for your body weight when a workout starts. Off starts the session straight away.': 'Edzés indításakor rákérdez a testsúlyodra. Kikapcsolva az edzés azonnal indul.',
   'No weigh-ins yet. Log your weight to start the curve.': 'Még nincs mérés. Rögzítsd a súlyodat a görbe indításához.',
+  'Comes automatically from Apple Health': 'Automatikusan érkezik az Apple Healthből',
   'Music playing on this phone stops during a workout and does not resume by itself.': 'A telefonon szóló zene edzés közben leáll, és nem indul újra magától.',
   'The quieter three-beep sound from before 1.3.9, instead of the louder chime.': 'Az 1.3.9 előtti halkabb, három sípolásból álló hang a hangosabb csengés helyett.',
   'Import from Hevy': 'Importálás a Hevyből',

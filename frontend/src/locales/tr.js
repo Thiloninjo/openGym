@@ -454,6 +454,7 @@ export default {
   'Weigh in before workouts': 'Antrenman öncesi tartılma',
   'Asks for your body weight when a workout starts. Off starts the session straight away.': 'Antrenman başlarken kilonu sorar. Kapalıyken seans hemen başlar.',
   'No weigh-ins yet. Log your weight to start the curve.': 'Henüz tartı kaydı yok. Eğriyi başlatmak için kilonu gir.',
+  'Comes automatically from Apple Health': 'Apple Health’ten otomatik gelir',
   'Music playing on this phone stops during a workout and does not resume by itself.': 'Bu telefonda çalan müzik antrenman sırasında durur ve kendiliğinden devam etmez.',
   'The quieter three-beep sound from before 1.3.9, instead of the louder chime.': '1.3.9 öncesindeki daha sessiz üçlü bip sesi, daha yüksek çalan sesi yerine.',
   'Sounds': 'Sesler',

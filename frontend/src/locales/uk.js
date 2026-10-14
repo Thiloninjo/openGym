@@ -1173,6 +1173,7 @@ export default {
   "Weigh in before workouts": "Зважування перед тренуванням",
   "Asks for your body weight when a workout starts. Off starts the session straight away.": 'Запитує твою вагу на початку тренування. Якщо вимкнено, сесія починається одразу.',
   'No weigh-ins yet. Log your weight to start the curve.': 'Записів поки немає. Внеси вагу, щоб почати криву.',
+  'Comes automatically from Apple Health': 'Надходить автоматично з Apple Health',
   "Music playing on this phone stops during a workout and does not resume by itself.": "Музика, що грає на цьому телефоні, зупиняється під час тренування і сама не відновлюється.",
   'The quieter three-beep sound from before 1.3.9, instead of the louder chime.': 'Тихіший звук із трьох сигналів, як до версії 1.3.9, замість гучнішого дзвону.',
   'Deletes your plan, workouts, body weight, photos and videos from your profile on this server and on every signed-in device. This cannot be undone.': 'Видаляє план, тренування, вагу тіла, фото й відео з профілю на цьому сервері й на всіх пристроях, де виконано вхід. Скасувати неможливо.',

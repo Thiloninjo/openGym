@@ -454,6 +454,7 @@ export default {
   'Weigh in before workouts': 'वर्कआउट से पहले वज़न दर्ज करना',
   'Asks for your body weight when a workout starts. Off starts the session straight away.': 'वर्कआउट शुरू होते समय आपका वज़न पूछता है। बंद होने पर सेशन सीधे शुरू होता है।',
   'No weigh-ins yet. Log your weight to start the curve.': 'अभी कोई वज़न दर्ज नहीं। ग्राफ़ शुरू करने के लिए वज़न दर्ज करें।',
+  'Comes automatically from Apple Health': 'Apple Health से अपने आप आता है',
   'Music playing on this phone stops during a workout and does not resume by itself.': 'इस फ़ोन पर चल रहा संगीत वर्कआउट के दौरान रुक जाता है और अपने आप फिर से शुरू नहीं होता।',
   'The quieter three-beep sound from before 1.3.9, instead of the louder chime.': 'तेज़ चाइम के बजाय 1.3.9 से पहले वाली शांत तीन-बीप ध्वनि।',
   'Sounds': 'ध्वनियाँ',

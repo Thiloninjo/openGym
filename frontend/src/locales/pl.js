@@ -454,6 +454,7 @@ export default {
   'Weigh in before workouts': 'Ważenie przed treningiem',
   'Asks for your body weight when a workout starts. Off starts the session straight away.': 'Pyta o twoją masę ciała przy rozpoczęciu treningu. Gdy wyłączone, sesja zaczyna się od razu.',
   'No weigh-ins yet. Log your weight to start the curve.': 'Brak pomiarów wagi. Zapisz wagę, aby zacząć krzywą.',
+  'Comes automatically from Apple Health': 'Pojawia się automatycznie z Apple Health',
   'Music playing on this phone stops during a workout and does not resume by itself.': 'Muzyka odtwarzana na tym telefonie zatrzymuje się podczas treningu i nie wznawia się sama.',
   'The quieter three-beep sound from before 1.3.9, instead of the louder chime.': 'Cichszy dźwięk trzech sygnałów sprzed wersji 1.3.9 zamiast głośniejszego dzwonka.',
   'Sounds': 'Dźwięki',
