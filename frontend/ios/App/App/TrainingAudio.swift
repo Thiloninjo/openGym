@@ -4,12 +4,16 @@ import Foundation
 /**
  * Thilos Fork: Ton-Seite des laufenden Trainings (TrainingLivePlugin).
  *
- * - Wachhalten: Während eines Trainings spielt eine stille Schleife in einer `.playback`-Session mit
- *   `.mixWithOthers`. Mit dem Hintergrundmodus `audio` (Info.plist) bleibt die App dadurch auch bei
- *   gesperrtem Bildschirm am Laufen, ohne andere Musik zu stören.
+ * - Wachhalten: Solange eine Pause läuft (und kurz danach), spielt eine stille Schleife in einer
+ *   `.playback`-Session mit `.mixWithOthers`. Mit dem Hintergrundmodus `audio` (Info.plist) bleibt die
+ *   App dadurch auch bei gesperrtem Bildschirm am Laufen, ohne andere Musik zu stören. Das Plugin
+ *   startet sie mit jeder Pause und lässt sie nach Pausenende und Ansage noch eine Weile laufen
+ *   (`stopKeepAlive(after:)`), damit nicht ein ganzes Training lang Akku draufgeht.
  * - Ansage: `speak` schaltet die Session kurz auf `.duckOthers` (andere Musik wird leiser), spricht
- *   den Text mit AVSpeechSynthesizer und gibt danach die Lautstärke zurück (Session kurz deaktivieren
- *   mit `.notifyOthersOnDeactivation`, wieder nur `.mixWithOthers`, Schleife läuft weiter).
+ *   den Text mit AVSpeechSynthesizer und gibt danach die Lautstärke zurück (Session deaktivieren mit
+ *   `.notifyOthersOnDeactivation`, wieder nur `.mixWithOthers`, Schleife läuft weiter). Scheitert das
+ *   Deaktivieren, wird die Ausgabe des Synthesizers hart beendet und länger weiter versucht; die
+ *   Session bleibt nie mit `.duckOthers` aktiv zurück.
  * - Unterbrechungen (Anruf, Siri, eine andere App übernimmt): danach wird die Schleife wieder gestartet.
  *
  * Alle Methoden laufen auf dem Main-Thread.
@@ -21,6 +25,8 @@ final class TrainingAudio: NSObject, AVSpeechSynthesizerDelegate {
     private var keepingAlive = false
     private var current: AVSpeechUtterance?
     private var restoreLater: DispatchWorkItem?
+    private var lingerStop: DispatchWorkItem?
+    private var lingerDelay: TimeInterval?   // Schleife nach dem Ende der laufenden Ansage noch so lange halten
 
     override init() {
         super.init()
@@ -35,18 +41,42 @@ final class TrainingAudio: NSObject, AVSpeechSynthesizerDelegate {
     }
 
     func startKeepAlive() {
+        cancelLinger()
         keepingAlive = true
         resume()
     }
 
     func stopKeepAlive() {
+        cancelLinger()
         keepingAlive = false
         player?.stop()
         player = nil
         if current == nil { deactivate() }
     }
 
-    /// Schleife (wieder) starten, falls ein Training läuft und gerade nichts gesprochen wird.
+    /// Schleife noch `delay` Sekunden halten, dann stoppen. Läuft gerade eine Ansage, zählt die Zeit
+    /// erst ab deren Ende.
+    func stopKeepAlive(after delay: TimeInterval) {
+        guard keepingAlive else { return }
+        cancelLinger()
+        if current != nil { lingerDelay = delay; return }
+        armLinger(delay)
+    }
+
+    private func armLinger(_ delay: TimeInterval) {
+        let work = DispatchWorkItem { [weak self] in self?.stopKeepAlive() }
+        lingerStop = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func cancelLinger() {
+        lingerStop?.cancel()
+        lingerStop = nil
+        lingerDelay = nil
+    }
+
+    /// Kategorie (.playback, .mixWithOthers) neu setzen und die Schleife (wieder) starten, solange sie
+    /// gebraucht wird und gerade nichts gesprochen wird (dann gilt die Ducking-Kategorie).
     func resume() {
         guard keepingAlive, current == nil else { return }
         activate(duck: false)
@@ -80,23 +110,42 @@ final class TrainingAudio: NSObject, AVSpeechSynthesizerDelegate {
         current = nil
         restoreLater?.cancel()
         restoreLater = nil
-        unduck(tries: 4)
+        unduck(attempt: 0)
     }
 
     // Erst das Deaktivieren gibt der anderen Musik ihre Lautstärke zurück. Hält der Synthesizer die
-    // Ausgabe noch einen Moment, scheitert es ("running I/O"): dann kurz danach noch einmal.
-    private func unduck(tries: Int) {
+    // Ausgabe noch ("running I/O"), scheitert es: nach dem dritten Fehlschlag wird er hart gestoppt,
+    // insgesamt gut 10 s lang weiter versucht. Klappt es nie, fliegt wenigstens .duckOthers aus der
+    // Kategorie, damit die Session nicht duckend aktiv bleibt.
+    private func unduck(attempt: Int) {
         guard current == nil else { return }
         player?.stop()
-        if !deactivate(notify: true) && tries > 1 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.unduck(tries: tries - 1) }
-            return
+        if !deactivate(notify: true) {
+            if attempt == 3 { synth.stopSpeaking(at: .immediate) }
+            if attempt < 20 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.unduck(attempt: attempt + 1) }
+                return
+            }
+            NSLog("%@", "[TrainingAudio] Session ließ sich nicht deaktivieren, nehme .duckOthers zurück")
+            do {
+                try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            } catch {
+                NSLog("%@", "[TrainingAudio] Kategorie ohne Ducking: \(error.localizedDescription)")
+            }
         }
         if keepingAlive {
             activate(duck: false)
             if player == nil { player = makePlayer() }
             player?.play()
         }
+        armPendingLinger()
+    }
+
+    // Die Ansage ist vorbei (oder abgebrochen): eine aufgeschobene Nachlaufzeit beginnt jetzt.
+    private func armPendingLinger() {
+        guard let delay = lingerDelay else { return }
+        lingerDelay = nil
+        if keepingAlive { armLinger(delay) }
     }
 
     // MARK: AVSpeechSynthesizerDelegate
@@ -141,6 +190,7 @@ final class TrainingAudio: NSObject, AVSpeechSynthesizerDelegate {
             case .began:
                 // Die Ansage ist mit unterbrochen worden; die Schleife hat iOS schon angehalten.
                 if self.current != nil { self.synth.stopSpeaking(at: .immediate); self.current = nil }
+                self.armPendingLinger()
             case .ended:
                 // Auch ohne .shouldResume: wir mischen nur mit, die stille Schleife stört niemanden.
                 self.resume()
@@ -154,6 +204,7 @@ final class TrainingAudio: NSObject, AVSpeechSynthesizerDelegate {
         DispatchQueue.main.async {
             self.player = nil
             self.current = nil
+            self.armPendingLinger()
             self.resume()
         }
     }
@@ -172,12 +223,30 @@ final class TrainingAudio: NSObject, AVSpeechSynthesizerDelegate {
         }
     }
 
+    // Die App-Sprache kommt als bloßer Code ("de"). Bevorzugte Varianten: de → de-DE, en → en-US;
+    // sonst die Systemsprache, wenn sie dieselbe Sprache ist, dann irgendeine Stimme der Sprache,
+    // zuletzt die Systemstimme.
+    private static let preferredLocale = ["de": "de-DE", "en": "en-US"]
+
     private static func voice(for lang: String?) -> AVSpeechSynthesisVoice? {
-        let code = (lang ?? "").isEmpty ? "de-DE" : lang!
+        let raw = (lang ?? "").replacingOccurrences(of: "_", with: "-").trimmingCharacters(in: .whitespaces)
+        let system = AVSpeechSynthesisVoice.currentLanguageCode()
+        let code: String
+        if raw.isEmpty {
+            code = "de-DE"
+        } else if let p = preferredLocale[raw.lowercased()] {
+            code = p
+        } else if raw.contains("-") {
+            code = raw
+        } else if system.lowercased().hasPrefix(raw.lowercased() + "-") {
+            code = system
+        } else {
+            code = raw
+        }
         if let v = AVSpeechSynthesisVoice(language: code) { return v }
-        let base = code.split(separator: "-").first.map(String.init) ?? code
-        if let v = AVSpeechSynthesisVoice.speechVoices().first(where: { $0.language.hasPrefix(base) }) { return v }
-        return AVSpeechSynthesisVoice(language: "de-DE")
+        let base = (code.split(separator: "-").first.map(String.init) ?? code).lowercased()
+        if let v = AVSpeechSynthesisVoice.speechVoices().first(where: { $0.language.lowercased().hasPrefix(base + "-") }) { return v }
+        return AVSpeechSynthesisVoice(language: system)
     }
 
     /// Eine Sekunde Stille als WAV (8 kHz, 16 Bit, mono), im Speicher erzeugt.

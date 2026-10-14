@@ -11,9 +11,10 @@ import ActivityKit
  * - Live-Aktivität (RestWidget): Name des Trainings, aktuelle Übung, Satz x von y und die laufende
  *   Trainingszeit; in der Pause Countdown mit Fortschrittsbalken, nach Ablauf der Hinweis aus JS
  *   („Pause vorbei. Nächster Satz!“). Endet mit dem Training.
- * - Wachhalten und Ansage (TrainingAudio): stille Schleife während des Trainings, zum Pausenende
- *   eine Ansage per Stimme, andere Musik wird solange leiser. Der Zeitgeber dafür läuft hier nativ,
- *   nicht im WebView (der wird im Hintergrund gedrosselt).
+ * - Wachhalten und Ansage (TrainingAudio): stille Schleife ab jeder Pause bis eine Minute nach ihrem
+ *   Ende (bzw. nach der Ansage), zum Pausenende eine Ansage per Stimme, andere Musik wird solange
+ *   leiser. Eine Ansage, die mehr als 5 s zu spät käme, entfällt. Der Zeitgeber dafür läuft hier
+ *   nativ, nicht im WebView (der wird im Hintergrund gedrosselt).
  *
  * Angemeldet in ThiloBridgeViewController (Capacitor 7: registerPluginInstance).
  * Aus JS (lib/thilo-ios-training.js):
@@ -58,8 +59,16 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
     private var restTimer: DispatchSourceTimer?
     private var chain: Task<Void, Never>?
 
+    /// So lange läuft die stille Schleife nach Pausenende (oder Ansage) bzw. nach dem Anhalten weiter.
+    private let keepAliveLinger: TimeInterval = 60
+    /// Später als das nach dem Pausenende wird nichts mehr angesagt (App war angehalten).
+    private let speechLateness: TimeInterval = 5
+
     override public func load() {
-        NotificationCenter.default.addObserver(self, selector: #selector(willEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
+        let nc = NotificationCenter.default
+        nc.addObserver(self, selector: #selector(willEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
+        nc.addObserver(self, selector: #selector(leavingForeground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        nc.addObserver(self, selector: #selector(leavingForeground), name: UIApplication.willResignActiveNotification, object: nil)
     }
 
     // MARK: Training
@@ -68,10 +77,9 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
         let fields = TrainingLivePlugin.fields(call)
         let startedAt = call.getDouble("startedAt").map { Date(timeIntervalSince1970: $0 / 1000) }
         DispatchQueue.main.async {
+            if let s = startedAt { self.live.startedAt = s } else if !self.training { self.live.startedAt = Date() }
             self.training = true
-            if let s = startedAt { self.live.startedAt = s }
             self.apply(fields)
-            self.audio.startKeepAlive()
             self.push()
             call.resolve()
         }
@@ -117,6 +125,7 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
             self.live.ready = false
             if let t = title { self.live.restTitle = t }
             if let d = doneTitle { self.live.doneTitle = d }
+            // Kommt immer aus dem Vordergrund: hier darf die Session sicher aktiviert werden.
             self.audio.startKeepAlive()
             self.scheduleRestEnd(at: end, speech: sound ? speech : nil, lang: lang)
             self.push()
@@ -137,6 +146,7 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
             self.live.ready = false
             if let t = title { self.live.restTitle = t }
             if let d = doneTitle { self.live.doneTitle = d }
+            self.audio.stopKeepAlive(after: self.keepAliveLinger)
             self.push()
             call.resolve()
         }
@@ -148,6 +158,7 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
             self.live.restEndsAt = nil
             self.live.restLeft = nil
             self.live.ready = false
+            self.audio.stopKeepAlive()
             self.push()
             call.resolve()
         }
@@ -159,7 +170,7 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
         cancelRestTimer()
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.main)
         timer.schedule(wallDeadline: .now() + max(0, end.timeIntervalSinceNow))
-        timer.setEventHandler { [weak self] in self?.restEnded(speech: speech, lang: lang) }
+        timer.setEventHandler { [weak self] in self?.restEnded(at: end, speech: speech, lang: lang) }
         restTimer = timer
         timer.resume()
     }
@@ -169,17 +180,26 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
         restTimer = nil
     }
 
-    private func restEnded(speech: String?, lang: String?) {
+    private func restEnded(at end: Date, speech: String?, lang: String?) {
         cancelRestTimer()
         live.restEndsAt = nil
         live.restLeft = nil
         live.ready = true
-        if let s = speech, !s.isEmpty { audio.speak(s, lang: lang) }
+        // War die App angehalten (z. B. Anruf), käme die Ansage verspätet: dann lieber keine.
+        let late = Date().timeIntervalSince(end) > speechLateness
+        if let s = speech, !s.isEmpty, !late { audio.speak(s, lang: lang) }
+        audio.stopKeepAlive(after: keepAliveLinger)
         push()
     }
 
     @objc private func willEnterForeground() {
-        DispatchQueue.main.async { if self.training { self.audio.resume() } }
+        DispatchQueue.main.async { self.audio.resume() }
+    }
+
+    // Auf dem Weg in den Hintergrund: steht ein Pausenende aus, Kategorie und Schleife sicherstellen,
+    // sonst wird die App angehalten und die Ansage kommt nicht.
+    @objc private func leavingForeground() {
+        DispatchQueue.main.async { if self.restTimer != nil { self.audio.startKeepAlive() } }
     }
 
     // MARK: Felder
