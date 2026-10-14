@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createRoot } from 'react-dom/client'
 import { DEF, useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
-import { bwSheet, weighInsSheet } from './sheets.jsx'
+import { weighInsSheet } from './sheets.jsx'
 
 const clone = v => JSON.parse(JSON.stringify(v))
 const mounted = []
@@ -66,21 +66,7 @@ describe('weigh-ins sheet', () => {
     weighInsSheet()
     const host = mountTopSheet()
     expect(host.querySelector('.empty')).toBeTruthy()
+    expect(host.querySelector('.empty').textContent).toBe('Comes automatically from Apple Health')
     expect(host.querySelector('.chart')).toBeNull()
-  })
-
-  it('is reached from the log sheet once there are more weigh-ins than its recent three', () => {
-    bwSheet()
-    const log = mountTopSheet()
-    expect(log.querySelectorAll('button[aria-label="Delete weigh-in"]')).toHaveLength(0)
-    const all = button(log, 'All weigh-ins')
-    expect(all).toBeTruthy()
-    act(() => { all.click() })
-    expect(mountTopSheet().querySelector('h3').textContent).toBe('Weigh-ins')
-
-    useUI.setState({ sheets: [] })
-    install({ bodyweight: clone(LOG).slice(0, 2) })
-    bwSheet()
-    expect(button(mountTopSheet(), 'All weigh-ins')).toBeUndefined()
   })
 })
