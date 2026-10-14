@@ -35,6 +35,8 @@ import { effectiveRoutineId } from './queue.js';
 import { stampPut } from './sync-stamps.js';
 import { atomicWrite as durableWrite } from './durable.js';
 import { excusedOn, nudgeFor, nudgeWindowOpen, toneOf } from './nudge.js';
+// Thilos Fork: Körpergewicht aus Apple Health (thilo/docs/2026-10-14-gewicht-aus-health.md).
+import { createHealthSync, healthConfig, habitsFetcher, keyMatches, fileMirror } from './thilo-health.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -1904,6 +1906,103 @@ function dataWritable() {
   return ok;
 }
 
+// Thilos Fork: der Schreibweg von PUT /api/data, herausgezogen für thilo-health.js (Gewicht aus
+// Apple Health), damit beide denselben Code nutzen. `cur` ist der gespeicherte Zustand (readStateStrict),
+// `next` der neue (wird verändert); zwischen Lesen und diesem Aufruf darf kein `await` liegen.
+// Zurück `{ok, rev, wid, ts}` oder `{error}` (eine ungültige Anfrage, 400).
+function commitState(uid, cur, next, { overRead = false, stamped = false } = {}) {
+  const curRev = cur?._rev || 0;
+  delete next.active;              // in-progress workouts stay device-local
+  // "Reset everything" stamps the profile (`resetAt`, with `resetIds`: what it wiped). The stamp
+  // only moves forward: a write without it, or with an older one — a client from before it, a
+  // backup restored over the profile — keeps the stored stamp. Otherwise every device that saw
+  // the reset would take that copy for one older than the reset, and wipe it again on its next
+  // merge (frontend/src/lib/sync-merge.js).
+  const storedReset = Number(cur?.resetAt) || 0;
+  if (storedReset > (Number(next.resetAt) || 0)) {
+    next.resetAt = cur.resetAt;
+    if (cur.resetIds && typeof cur.resetIds === 'object') next.resetIds = cur.resetIds;
+    else delete next.resetIds;
+  }
+  // The records of removals and edits only grow, and what a writer that does not stamp its own
+  // changes (an older app, an API script) changed is stamped here, so it is neither wiped nor
+  // undone by the next device that merges (sync-stamps.js).
+  // A document nested too deep to compare is the bad request the stringify below refuses too.
+  const report = {};
+  try { stampPut(cur, next, { overRead, stamped, report }); }
+  catch (e) { if (e instanceof RangeError) return { error: 'invalid state' }; throw e; }
+  next._rev = curRev + 1;          // server-owned; whatever the client sent is ignored
+  // A writer that does not stamp (an older app) takes the revision it is told for the document it
+  // sent, and only reads the profile again once the revision moves. When the server put back
+  // something it left out or set back (sync-stamps.js), the document stored is not that one: it
+  // goes in one revision further, so the writer's next check of the revision (every half minute)
+  // finds it moved and reads it, and its next push over the one it was told is a conflict to merge.
+  if (report.changed) next._rev = curRev + 2;
+  next._wids = [...(Array.isArray(cur?._wids) ? cur._wids : []), ...(cur?._wid ? [cur._wid] : [])]
+    .filter(x => typeof x === 'string').slice(-WID_KEEP);
+  next._wid = crypto.randomBytes(8).toString('hex');
+  // JSON.parse takes any nesting, JSON.stringify recurses and runs out of stack on a document
+  // nested some thousands deep. No client builds one; it is a bad request, not a server error.
+  let text;
+  try { text = JSON.stringify(next); }
+  catch (e) { if (e instanceof RangeError) return { error: 'invalid state' }; throw e; }
+  atomicWrite(stateFile(uid), text);
+  // The stat cache cannot see this write on its own: mtime granularity is 4 ms here (ext4 on
+  // this kernel — 3901 of 3999 back-to-back same-size writes shared one timestamp), and a
+  // `_rev` going from 7 to 8 does not change the file's size, so two writes inside one 4 ms
+  // tick are the same (mtimeMs, size) key. A reader that sampled between them would then serve
+  // the old revision until some later write happened to land on a different tick. This is the
+  // only writer of a state file in the tree, so evicting here is the whole fix.
+  stateCache.delete(uid);
+  // Starts (or stops) the grace clock of every stored file this write stopped (or started)
+  // referencing. Bookkeeping only: the state is already saved, so nothing here may turn a
+  // successful write into an error.
+  if (MEDIA_ON) {
+    try { MEDIA.noteState(uid, next); } catch (e) { console.error('media noteState', e); }
+  }
+  return { ok: true, ts: next._ts || null, rev: curRev + 1, wid: next._wid };
+}
+
+// Thilos Fork: Körpergewicht aus Apple Health. Holt die Wiegungen von der habits-api und schreibt
+// sie über commitState in den Zustand von HEALTH_UID: beim Start, alle 15 Minuten und auf den Hook
+// (POST /api/thilo/health-hook?key=…, im Dispatcher vor Session und CSRF). Ohne Konfiguration aus.
+const HEALTH_CFG = healthConfig(process.env);
+const HEALTH = HEALTH_CFG.ok ? (() => {
+  const mirror = fileMirror(path.join(DATA, 'thilo-health.json'), atomicWrite, fs);
+  return createHealthSync({
+    uid: HEALTH_CFG.uid,
+    fetchBody: habitsFetcher(HEALTH_CFG),
+    readState: uid => {
+      const S = readStateStrict(uid);
+      if (S === UNREADABLE) throw new Error('state unreadable');
+      return S;
+    },
+    commit: (uid, cur, next) => {
+      const done = commitState(uid, cur, next, { overRead: true, stamped: true });
+      if (done.error) throw new Error(done.error);
+    },
+    loadMirror: mirror.load,
+    saveMirror: mirror.save,
+    log: (...a) => console.log(...a),
+  });
+})() : null;
+console.log(HEALTH ? `thilo-health: an (Nutzer ${HEALTH_CFG.uid})` : `thilo-health: aus (${HEALTH_CFG.reason})`);
+const HEALTH_EVERY_MS = 15 * 60000;
+if (HEALTH) {
+  HEALTH.sync();
+  setInterval(() => HEALTH.sync(), HEALTH_EVERY_MS).unref();
+}
+async function healthHook(req, res, url) {
+  if (!HEALTH || req.method !== 'POST') return json(res, 404, { error: 'not found' });
+  if (!keyMatches(url.searchParams.get('key'), HEALTH_CFG.key)) return json(res, 403, { error: 'forbidden' });
+  let body;
+  try { body = await readBody(req); }
+  catch (e) { return json(res, e instanceof HttpError ? e.status : 400, { error: e?.message || 'bad request' }); }
+  const run = body?.type === 'body.changed';
+  if (run) HEALTH.sync().catch(e => console.error('thilo-health', e));
+  json(res, 202, { ok: true, run });
+}
+
 const routes = {
   // 503 rather than a flag in a 200: the container healthcheck is `wget --spider`, which reads
   // the status and nothing else, and an instance that cannot write its data directory is exactly
@@ -2239,55 +2338,10 @@ const routes = {
         (body.baseRev != null && typeof body.baseWid === 'string' && cur?._wid && body.baseWid !== cur._wid)) {
       return json(res, 409, { error: 'conflict', rev: curRev, state: forClient(cur) });
     }
-    delete body.state.active;              // in-progress workouts stay device-local
-    // "Reset everything" stamps the profile (`resetAt`, with `resetIds`: what it wiped). The stamp
-    // only moves forward: a write without it, or with an older one — a client from before it, a
-    // backup restored over the profile — keeps the stored stamp. Otherwise every device that saw
-    // the reset would take that copy for one older than the reset, and wipe it again on its next
-    // merge (frontend/src/lib/sync-merge.js).
-    const storedReset = Number(cur?.resetAt) || 0;
-    if (storedReset > (Number(body.state.resetAt) || 0)) {
-      body.state.resetAt = cur.resetAt;
-      if (cur.resetIds && typeof cur.resetIds === 'object') body.state.resetIds = cur.resetIds;
-      else delete body.state.resetIds;
-    }
-    // The records of removals and edits only grow, and what a writer that does not stamp its own
-    // changes (an older app, an API script) changed is stamped here, so it is neither wiped nor
-    // undone by the next device that merges (sync-stamps.js).
-    // A document nested too deep to compare is the bad request the stringify below refuses too.
-    const report = {};
-    try { stampPut(cur, body.state, { overRead: body.baseRev != null && body.baseRev === curRev, stamped: body.stamped === true, report }); }
-    catch (e) { if (e instanceof RangeError) return json(res, 400, { error: 'invalid state' }); throw e; }
-    body.state._rev = curRev + 1;          // server-owned; whatever the client sent is ignored
-    // A writer that does not stamp (an older app) takes the revision it is told for the document it
-    // sent, and only reads the profile again once the revision moves. When the server put back
-    // something it left out or set back (sync-stamps.js), the document stored is not that one: it
-    // goes in one revision further, so the writer's next check of the revision (every half minute)
-    // finds it moved and reads it, and its next push over the one it was told is a conflict to merge.
-    if (report.changed) body.state._rev = curRev + 2;
-    body.state._wids = [...(Array.isArray(cur?._wids) ? cur._wids : []), ...(cur?._wid ? [cur._wid] : [])]
-      .filter(x => typeof x === 'string').slice(-WID_KEEP);
-    body.state._wid = crypto.randomBytes(8).toString('hex');
-    // JSON.parse takes any nesting, JSON.stringify recurses and runs out of stack on a document
-    // nested some thousands deep. No client builds one; it is a bad request, not a server error.
-    let text;
-    try { text = JSON.stringify(body.state); }
-    catch (e) { if (e instanceof RangeError) return json(res, 400, { error: 'invalid state' }); throw e; }
-    atomicWrite(stateFile(user.id), text);
-    // The stat cache cannot see this write on its own: mtime granularity is 4 ms here (ext4 on
-    // this kernel — 3901 of 3999 back-to-back same-size writes shared one timestamp), and a
-    // `_rev` going from 7 to 8 does not change the file's size, so two writes inside one 4 ms
-    // tick are the same (mtimeMs, size) key. A reader that sampled between them would then serve
-    // the old revision until some later write happened to land on a different tick. This is the
-    // only writer of a state file in the tree, so evicting here is the whole fix.
-    stateCache.delete(user.id);
-    // Starts (or stops) the grace clock of every stored file this write stopped (or started)
-    // referencing. Bookkeeping only: the state is already saved, so nothing here may turn a
-    // successful write into an error.
-    if (MEDIA_ON) {
-      try { MEDIA.noteState(user.id, body.state); } catch (e) { console.error('media noteState', e); }
-    }
-    json(res, 200, { ok: true, ts: body.state._ts || null, rev: curRev + 1, wid: body.state._wid });
+    // Thilos Fork: der Schreibweg steht in commitState (oben), damit thilo-health.js ihn mitnutzt.
+    const done = commitState(user.id, cur, body.state, { overRead: body.baseRev != null && body.baseRev === curRev, stamped: body.stamped === true });
+    if (done.error) return json(res, 400, { error: done.error });
+    json(res, 200, { ok: true, ts: done.ts, rev: done.rev, wid: done.wid });
   },
 
   'GET /api/push/public-key': async (req, res) => json(res, 200, { key: vapid.publicKey }),
@@ -2653,6 +2707,8 @@ const server = http.createServer(async (req, res) => {
   let url;
   try { url = new URL(req.url, 'http://x'); }
   catch { return json(res, 400, { error: 'bad request' }); }
+  // Thilos Fork: der Health-Hook prüft seinen eigenen Schlüssel, vor Session und CSRF.
+  if (url.pathname === '/api/thilo/health-hook') return healthHook(req, res, url);
   let key = req.method + ' ' + url.pathname;
   // The one route with a parameter in its path. Mapped onto its template key here so the table
   // above stays a plain lookup, and so csrfOk and the catch-all see one name for every file.
