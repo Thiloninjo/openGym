@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { api, setRemoteAuth } from '../lib/api.js'
 import { localTZ } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
-import { registerCustom, healCustomEx } from '../lib/exercises.js'
+import { registerCustom, healCustomEx, exOr } from '../lib/exercises.js'
 import { DEMO, DEMO_SEEDED } from '../lib/demo.js'
 import { rememberDefaultLang } from '../lib/default-lang.js'
 import { guestAllowed } from '../lib/guest.js'
@@ -22,7 +22,9 @@ import { linkTokenFromSearch, stripLinkFromUrl } from '../lib/device-link.js'
 import { loadRemote, chooseLocal, forgetRemote, connect, normalizeServerUrl, renewToken } from '../lib/remote.js'
 import { loadCfAccess } from '../lib/cf-access.js'
 import { loadCoachDevice, saveCoachDevice, coachDeviceSettings } from '../lib/coach-device.js'
-import { RTL_LANGS } from '../lib/i18n-core.js'
+import { RTL_LANGS, exerciseNameFor } from '../lib/i18n-core.js'
+import { applyCoachLive } from '../lib/coach-live.js'
+import { buildSwapReplacement } from '../lib/swap-replacement.js'
 import { DEFAULT_TEMPLATE_ID } from '../lib/structuralBalanceTemplates.js'
 
 import { WC_DEFAULT } from '../lib/workout-controls.js'
@@ -63,6 +65,10 @@ const LOGOUT_OWED_KEY = 'gym_logout_owed'
 // question was open). Kept in storage so an app killed with the question open asks it again on
 // the next start instead of pushing the copy it still holds.
 const ADOPT_KEY = 'gym_adopt'
+// Thilos Fork: die ID des letzten Live-Tauschs des Coaches, den dieses Gerät verarbeitet hat
+// (lib/coach-live.js). Nur auf dem Gerät, nie synchronisiert: jedes Gerät erledigt den Auftrag für
+// sein eigenes laufendes Training.
+const COACH_DONE_KEY = 'gym_coach_live_done'
 // Reads the mark with no argument, sets or clears it with one. Storage that cannot be read owes nothing.
 function logoutOwed(on) {
   try {
@@ -562,6 +568,43 @@ export const useStore = create((set, get) => {
     if (hasData(S)) keepAside(S, t('This device, before signing in'), staleUid).catch(() => {})
     return true
   }
+  // Thilos Fork: ein neuer Live-Tausch des Coaches (`S.coachLive`) wird auf das laufende Training
+  // dieses Geräts angewendet, sobald ein Stand ihn bringt: Pull, Merge, Start (lib/coach-live.js).
+  // Ändert `S.active`; zurück das Ergebnis für tellCoachLive, oder null.
+  const readCoachDone = () => { try { return localStorage.getItem(COACH_DONE_KEY) } catch { return null } }
+  const coachPending = S => !!S?.coachLive?.id && S.coachLive.id !== readCoachDone()
+  const takeCoachLive = S => {
+    if (!coachPending(S)) return null
+    let r
+    try {
+      r = applyCoachLive(S.active, S.coachLive, readCoachDone(), {
+        build: (current, exId, cfg) => buildSwapReplacement(S, current, exId, cfg),
+        nameOf: id => exerciseNameFor(exOr(id)),
+      })
+    } catch (e) { console.error('coachLive', e); return null }
+    try { localStorage.setItem(COACH_DONE_KEY, r.doneId) } catch { /* am Training vermerkt (coachLiveId) */ }
+    S.active = r.active
+    return r
+  }
+  // Der Hinweis im Training, und die Pause, die an einer Übung hängt (timer.forIdx), rückt mit,
+  // wenn ein Ersatz davor eingefügt wurde. Ein laufender Halte-Timer hängt an Stellen, die sich
+  // verschoben haben, und hört auf.
+  const tellCoachLive = r => {
+    if (!r || (!r.notices.length && !r.inserted.length)) return
+    import('./useUI.js').then(({ useUI }) => {
+      const ui = useUI.getState()
+      if (r.inserted.length) {
+        const tm = ui.timer
+        if (tm && tm.forIdx != null) {
+          let f = tm.forIdx
+          for (const i of r.inserted) if (i <= f) f++
+          if (f !== tm.forIdx) useUI.setState({ timer: { ...tm, forIdx: f } })
+        }
+        if (ui.work) ui.stopWork()
+      }
+      if (r.notices.length) ui.toast(r.notices.join(' · '), { ms: 6000 })
+    }).catch(() => {})
+  }
   const persist = (S, push = true, stamp = true) => {
     if (refuseStale(S)) return
     const { base, owed } = metaOf()   // the copy being replaced; the new one stands where it stood
@@ -574,6 +617,7 @@ export const useStore = create((set, get) => {
     // goes out with it on the next push, without a stamp of its own (healCustomEx).
     S.customEx = healCustomEx(S.customEx)
     registerCustom(S.customEx)
+    const coach = takeCoachLive(S)
     // A refused write used to take the change with it — Finish looked like it simply did
     // nothing. The copy is kept in memory either way and marked as owed to the server, so a
     // signed-in device still gets it there; and it is said out loud once, because a change that
@@ -605,6 +649,7 @@ export const useStore = create((set, get) => {
     meta.set(S, { base, owed: owed || !saved || (!!joined && storedOwed()) })
     if (!saved) saveOwed(true)
     set({ S })
+    tellCoachLive(coach)
     // A copy that replaces the last one wholesale and keeps an older stamp — adopted from the
     // server — goes to the file at once. Until it does, the file holds the copy it replaced,
     // which looks newer, and a start in between would take that one back (restoreFromMirror).
@@ -620,6 +665,8 @@ export const useStore = create((set, get) => {
   // Boot's last step: from here on changes push, and one made during boot goes now.
   const finishBoot = (extra = {}) => {
     set({ ready: true, ...extra })
+    // Ein Auftrag, den der gespeicherte Stand schon trug, aber noch nicht verarbeitet war.
+    if (coachPending(get().S)) persist(clone(get().S), false, false)
     if (pushPending && get().user) {
       clearTimeout(pushTm)
       pushTm = setTimeout(() => get().pushState(), 1500)
