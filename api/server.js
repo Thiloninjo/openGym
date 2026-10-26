@@ -37,6 +37,8 @@ import { atomicWrite as durableWrite } from './durable.js';
 import { excusedOn, nudgeFor, nudgeWindowOpen, toneOf } from './nudge.js';
 // Thilos Fork: Körpergewicht aus Apple Health (thilo/docs/2026-10-14-gewicht-aus-health.md).
 import { createHealthSync, healthConfig, habitsFetcher, keyMatches, fileMirror } from './thilo-health.js';
+// Thilos Fork: Coach-Hook (thilo/docs/2026-10-26-coach-hook.md).
+import { coachHookConfig, applyCoachOps, searchExercises, CATALOG } from './thilo-coach.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -2004,6 +2006,36 @@ async function healthHook(req, res, url) {
   json(res, 202, { ok: true, run });
 }
 
+// Thilos Fork: Coach-Hook. POST /api/thilo/coach?key=… ändert Routinen und Tagesplan und legt einen
+// Live-Tausch ab (thilo-coach.js); GET /api/thilo/coach/exercises?key=…&q=… sucht Übungs-IDs.
+// Im Dispatcher vor Session und CSRF; nginx sperrt /api/thilo/ nach außen. Ohne Konfiguration 404.
+const COACH_CFG = coachHookConfig(process.env);
+console.log(COACH_CFG.ok ? `thilo-coach: an (Nutzer ${COACH_CFG.uid})` : `thilo-coach: aus (${COACH_CFG.reason})`);
+async function coachHook(req, res, url) {
+  if (!COACH_CFG.ok) return json(res, 404, { error: 'not found' });
+  if (!keyMatches(url.searchParams.get('key'), COACH_CFG.key)) return json(res, 403, { error: 'forbidden' });
+  const uid = COACH_CFG.uid;
+  if (url.pathname === '/api/thilo/coach/exercises' && req.method === 'GET') {
+    const S = readStateStrict(uid);
+    return json(res, 200, searchExercises(url.searchParams.get('q') || '', S === UNREADABLE ? null : S, CATALOG));
+  }
+  if (url.pathname !== '/api/thilo/coach' || req.method !== 'POST') return json(res, 404, { error: 'not found' });
+  let body;
+  try { body = await readBody(req); }
+  catch (e) { return json(res, e instanceof HttpError ? e.status : 400, { error: e?.message || 'bad request' }); }
+  // Ab hier synchron: lesen, ändern, schreiben, ohne await dazwischen. stamped:false, damit der
+  // Server die Änderungen selbst stempelt und ein Gerät mit älterem Stand sie nicht zurückdreht.
+  const cur = readStateStrict(uid);
+  if (cur === UNREADABLE) { console.error('thilo-coach: state unreadable for', uid); return json(res, 503, { error: 'state unreadable' }); }
+  if (!cur) return json(res, 400, { error: 'kein Zustand für diesen Nutzer' });
+  const r = applyCoachOps(cur, body?.ops, CATALOG);
+  if (r.error) return json(res, 400, { error: r.error });
+  const done = commitState(uid, cur, r.next, { overRead: true, stamped: false });
+  if (done.error) return json(res, 400, { error: done.error });
+  console.log(`thilo-coach: ${r.applied.map(a => a.op).join(', ')} → rev ${done.rev}`);
+  json(res, 200, { ok: true, rev: done.rev, applied: r.applied });
+}
+
 const routes = {
   // 503 rather than a flag in a 200: the container healthcheck is `wget --spider`, which reads
   // the status and nothing else, and an instance that cannot write its data directory is exactly
@@ -2710,6 +2742,7 @@ const server = http.createServer(async (req, res) => {
   catch { return json(res, 400, { error: 'bad request' }); }
   // Thilos Fork: der Health-Hook prüft seinen eigenen Schlüssel, vor Session und CSRF.
   if (url.pathname === '/api/thilo/health-hook') return healthHook(req, res, url);
+  if (url.pathname === '/api/thilo/coach' || url.pathname === '/api/thilo/coach/exercises') return coachHook(req, res, url);
   let key = req.method + ' ' + url.pathname;
   // The one route with a parameter in its path. Mapped onto its template key here so the table
   // above stays a plain lookup, and so csrfOk and the catch-all see one name for every file.
