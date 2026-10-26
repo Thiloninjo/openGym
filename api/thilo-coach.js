@@ -190,3 +190,17 @@ export function applyCoachOps(state, ops, catalog = CATALOG, { now = Date.now, n
   }
   return { next, applied };
 }
+
+/**
+ * Sync-Regel für `coachLive`: Den Auftrag schreibt nur der Coach-Hook. Jeder andere Schreiber
+ * (PUT /api/data der App, ein älteres Gerät, ein Backup-Import, der Health-Hook) behält den
+ * gespeicherten, so dass ein Gerät mit altem Stand einen erledigten Auftrag nicht zurückbringt und
+ * einen neueren nicht überschreibt. Hat der gespeicherte Stand keinen, kommt auch keiner hinein.
+ * Ändert `next` und gibt es zurück.
+ */
+export function keepCoachLive(cur, next) {
+  if (!isMap(next)) return next;
+  if (isMap(cur) && isMap(cur.coachLive)) next.coachLive = JSON.parse(JSON.stringify(cur.coachLive));
+  else delete next.coachLive;
+  return next;
+}

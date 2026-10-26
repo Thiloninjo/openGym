@@ -10,7 +10,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { boundPort } from './helpers.mjs';
-import { applyCoachOps, searchExercises, coachHookConfig, CATALOG } from '../thilo-coach.js';
+import { applyCoachOps, searchExercises, coachHookConfig, keepCoachLive, CATALOG } from '../thilo-coach.js';
 import { DE_NAMES } from '../thilo-exercise-names-de.js';
 
 const API = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -114,6 +114,23 @@ test('live-swap: schreibt coachLive mit neuer ID, mehrere ops in einem Auftrag',
   assert.match(a.next.coachLive.id, /^[0-9a-f]{16}$/);
   assert.notEqual(a.next.coachLive.id, b.next.coachLive.id);
   assert.ok(Number.isFinite(a.next.coachLive.ts));
+});
+
+test('keepCoachLive: andere Schreiber behalten den gespeicherten Auftrag', () => {
+  const live = { id: 'neu', ts: 2, ops: [{ exId: '0334', newExId: '0584' }] };
+  // ein altes Gerät schickt einen älteren Auftrag zurück → der gespeicherte bleibt
+  let next = keepCoachLive({ coachLive: live }, { coachLive: { id: 'alt', ts: 1, ops: [] } });
+  assert.deepEqual(next.coachLive, live);
+  // ein Gerät ohne Auftrag (Backup, Reset) löscht ihn nicht
+  next = keepCoachLive({ coachLive: live }, {});
+  assert.deepEqual(next.coachLive, live);
+  next.coachLive.ops.length = 0;
+  assert.equal(live.ops.length, 1, 'Kopie, nicht dieselbe Referenz');
+  // gespeichert ist keiner → ein alter aus dem Gerät kommt nicht zurück
+  next = keepCoachLive({}, { coachLive: { id: 'alt', ts: 1, ops: [] } });
+  assert.equal('coachLive' in next, false);
+  next = keepCoachLive(null, { coachLive: { id: 'alt', ts: 1, ops: [] } });
+  assert.equal('coachLive' in next, false);
 });
 
 test('unbekannte IDs → Fehler', () => {
@@ -272,4 +289,46 @@ test('Server mit Konfiguration: 403, 400, Schreiben mit rev, Suche', async t => 
   assert.equal(hits[0].id, '0584');
   const own = await (await h.search(KEY, 'Turm')).json();
   assert.equal(own[0].id, 'c_seit');
+});
+
+function mintSession(uid) {
+  const payload = `${uid}:${Date.now() + 86400000}:0`;
+  return payload + '.' + crypto.createHmac('sha256', SECRET).update(payload).digest('base64url');
+}
+
+test('Server: PUT /api/data bringt keinen alten coachLive zurück und überschreibt keinen neuen', async t => {
+  const h = await startServer(t, { COACH_HOOK_KEY: KEY, HEALTH_UID: UID });
+  const headers = { Cookie: `gymsid=${mintSession(UID)}`, 'Content-Type': 'application/json' };
+  const get = async () => (await fetch(`${h.api}/api/data`, { headers })).json();
+  const put = async body => (await fetch(`${h.api}/api/data`, { method: 'PUT', headers, body: JSON.stringify(body) })).status;
+
+  let r = await h.post(KEY, { ops: [{ op: 'live-swap', exId: '0334', newExId: '0584' }] });
+  assert.equal(r.status, 200);
+  const live = h.state().coachLive;
+  assert.ok(live?.id);
+  assert.ok(h.state().edited.coachLive > 0, 'vom Server gestempelt');
+
+  // Die App liest, ändert etwas anderes und schreibt über die gelesene Revision: der Auftrag bleibt.
+  let { state, rev } = await get();
+  assert.deepEqual(state.coachLive, live);
+  assert.equal(await put({ state: { ...state, restSec: 75, coachLive: { id: 'alt', ts: 1, ops: [] } }, baseRev: rev, baseWid: state._wid, stamped: true }), 200);
+  assert.deepEqual(h.state().coachLive, live, 'alter Auftrag aus dem Gerät überschreibt den neuen nicht');
+  assert.equal(h.state().restSec, 75);
+
+  // Ein Ersetzen ohne baseRev (Backup-Import) ohne coachLive löscht ihn nicht.
+  ({ state } = await get());
+  const { coachLive, ...rest } = state;
+  assert.equal(await put({ state: rest, stamped: true }), 200);
+  assert.deepEqual(h.state().coachLive, live);
+
+  // Ein älteres Gerät (stamped:false) ebenso.
+  ({ state, rev } = await get());
+  assert.equal(await put({ state: { ...state, coachLive: undefined }, baseRev: rev }), 200);
+  assert.deepEqual(h.state().coachLive, live);
+
+  // Ein neuer Auftrag vom Hook ersetzt den alten.
+  r = await h.post(KEY, { ops: [{ op: 'live-swap', exId: '0001', newExId: '0007' }] });
+  assert.equal(r.status, 200);
+  assert.notEqual(h.state().coachLive.id, live.id);
+  assert.equal(h.state().coachLive.ops[0].exId, '0001');
 });

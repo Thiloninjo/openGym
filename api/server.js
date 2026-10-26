@@ -38,7 +38,7 @@ import { excusedOn, nudgeFor, nudgeWindowOpen, toneOf } from './nudge.js';
 // Thilos Fork: Körpergewicht aus Apple Health (thilo/docs/2026-10-14-gewicht-aus-health.md).
 import { createHealthSync, healthConfig, habitsFetcher, keyMatches, fileMirror } from './thilo-health.js';
 // Thilos Fork: Coach-Hook (thilo/docs/2026-10-26-coach-hook.md).
-import { coachHookConfig, applyCoachOps, searchExercises, CATALOG } from './thilo-coach.js';
+import { coachHookConfig, applyCoachOps, searchExercises, keepCoachLive, CATALOG } from './thilo-coach.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -1912,9 +1912,12 @@ function dataWritable() {
 // Apple Health), damit beide denselben Code nutzen. `cur` ist der gespeicherte Zustand (readStateStrict),
 // `next` der neue (wird verändert); zwischen Lesen und diesem Aufruf darf kein `await` liegen.
 // Zurück `{ok, rev, wid, ts}` oder `{error}` (eine ungültige Anfrage, 400).
-function commitState(uid, cur, next, { overRead = false, stamped = false } = {}) {
+function commitState(uid, cur, next, { overRead = false, stamped = false, coachLive = false } = {}) {
   const curRev = cur?._rev || 0;
   delete next.active;              // in-progress workouts stay device-local
+  // Thilos Fork: `coachLive` schreibt nur der Coach-Hook; jeder andere Schreiber behält den
+  // gespeicherten (thilo-coach.js keepCoachLive).
+  if (!coachLive) keepCoachLive(cur, next);
   // "Reset everything" stamps the profile (`resetAt`, with `resetIds`: what it wiped). The stamp
   // only moves forward: a write without it, or with an older one — a client from before it, a
   // backup restored over the profile — keeps the stored stamp. Otherwise every device that saw
@@ -2030,7 +2033,7 @@ async function coachHook(req, res, url) {
   if (!cur) return json(res, 400, { error: 'kein Zustand für diesen Nutzer' });
   const r = applyCoachOps(cur, body?.ops, CATALOG);
   if (r.error) return json(res, 400, { error: r.error });
-  const done = commitState(uid, cur, r.next, { overRead: true, stamped: false });
+  const done = commitState(uid, cur, r.next, { overRead: true, stamped: false, coachLive: true });
   if (done.error) return json(res, 400, { error: done.error });
   console.log(`thilo-coach: ${r.applied.map(a => a.op).join(', ')} → rev ${done.rev}`);
   json(res, 200, { ok: true, rev: done.rev, applied: r.applied });
