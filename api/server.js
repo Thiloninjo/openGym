@@ -39,6 +39,8 @@ import { excusedOn, nudgeFor, nudgeWindowOpen, toneOf } from './nudge.js';
 import { createHealthSync, healthConfig, habitsFetcher, keyMatches, fileMirror } from './thilo-health.js';
 // Thilos Fork: Coach-Hook (thilo/docs/2026-10-26-coach-hook.md).
 import { coachHookConfig, applyCoachOps, searchExercises, keepCoachLive, CATALOG } from './thilo-coach.js';
+// Thilos Fork: Gym in Todoist abhaken (thilo/docs/2026-10-27-gym-todoist.md).
+import { todoistConfig, completeGym, createGymTick } from './thilo-todoist.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -1908,6 +1910,12 @@ function dataWritable() {
   return ok;
 }
 
+// Thilos Fork: ein neues, heute beendetes Training von TODOIST_UID hakt „Gym“ in Todoist ab
+// (thilo-todoist.js). Ohne Konfiguration aus.
+const TODOIST_CFG = todoistConfig(process.env);
+const GYM = TODOIST_CFG.ok ? createGymTick({ uid: TODOIST_CFG.uid, complete: () => completeGym(TODOIST_CFG) }) : null;
+console.log(GYM ? `thilo-todoist: an (Nutzer ${TODOIST_CFG.uid}, Aufgabe „${TODOIST_CFG.title}“)` : `thilo-todoist: aus (${TODOIST_CFG.reason})`);
+
 // Thilos Fork: der Schreibweg von PUT /api/data, herausgezogen für thilo-health.js (Gewicht aus
 // Apple Health), damit beide denselben Code nutzen. `cur` ist der gespeicherte Zustand (readStateStrict),
 // `next` der neue (wird verändert); zwischen Lesen und diesem Aufruf darf kein `await` liegen.
@@ -1964,6 +1972,10 @@ function commitState(uid, cur, next, { overRead = false, stamped = false, coachL
   // successful write into an error.
   if (MEDIA_ON) {
     try { MEDIA.noteState(uid, next); } catch (e) { console.error('media noteState', e); }
+  }
+  // Thilos Fork: Gym in Todoist abhaken; läuft im Hintergrund, der Schreibweg wartet nicht darauf.
+  if (GYM) {
+    try { GYM.onCommit(uid, cur, next); } catch (e) { console.error('thilo-todoist', e); }
   }
   return { ok: true, ts: next._ts || null, rev: curRev + 1, wid: next._wid };
 }
