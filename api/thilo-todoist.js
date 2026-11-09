@@ -31,6 +31,11 @@ export function newFinishedToday(cur, next, now = Date.now()) {
     && Number.isFinite(w.end) && berlinDay(w.end) === today);
 }
 
+// „Gym“ heißt Krafttraining (Todoist: „Fertig, wenn: Krafttraining gemacht“). Die Cardio-Routinen
+// aus dem Cut-Plan (seit 09.11.2026 in openGym) haken es nicht ab.
+const NOT_GYM = new Set(['sprints', 'laufband']);
+export const countsAsGym = w => !NOT_GYM.has(String(w?.name || '').trim().toLowerCase());
+
 /** Passt der Aufgabentitel? Ohne „[Bereich] “ davor, ohne Groß/Klein. */
 export function titleMatches(content, title) {
   const bare = String(content || '').replace(/^\s*\[[^\]]*\]\s*/, '').trim().toLowerCase();
@@ -86,7 +91,7 @@ export function createGymTick({ uid, complete, log = console.log, now = Date.now
   return {
     onCommit(u, cur, next) {
       if (u !== uid) return null;
-      const fresh = newFinishedToday(cur, next, now());
+      const fresh = newFinishedToday(cur, next, now()).filter(countsAsGym);
       if (!fresh.length) return null;
       log(`thilo-todoist: Training beendet (${fresh.map(w => w.name || w.id).join(', ')})`);
       return kick();

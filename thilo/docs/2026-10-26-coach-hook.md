@@ -25,9 +25,12 @@ Code: `api/thilo-coach.js` (reine Logik), Verdrahtung in `api/server.js` (`coach
 | `update-exercise` | `routineId`, `exId`, `cfg` | Ändert die Einstellungen der Übung. |
 | `set-day` | `date` (YYYY-MM-DD), `routineId` / `"rest"` / `null` | Setzt `dayPlan[date]`; `null` löscht den Eintrag. |
 | `live-swap` | `exId`, `newExId`, `cfg?`, `note?` | Schreibt `coachLive: {id, ts, ops}`; die App tauscht im laufenden Training. |
+| `add-routine` | `name`, `exercises: [{exId, cfg?}]`, `emoji?` | Neue Routine (seit 09.11.2026). Grundeinstellung je Übung wie `defaultConfig` der App, `cfg` darüber. Name muss neu sein; `applied` nennt die neue `routineId`. |
+| `set-week` | `weekday` (0 = So … 6), `routineIds` (0–5) | Setzt den Wochenplan für einen Wochentag; leere Liste macht ihn frei (seit 09.11.2026). |
 
 - `cfg`: `sets` (1–20), `reps` (1–100), `repsMin` (1–100, ≤ reps), `weight` (0–1000), `note` (≤ 200 Zeichen);
-  `null` entfernt `repsMin`, `weight`, `note`.
+  `null` entfernt `repsMin`, `weight`, `note`. Seit 09.11.2026 zusätzlich `mode` (`reps`, `time`, `cardio`),
+  `sec` (1–3600), `min` (1–600), `speed` (0–50).
 - Übungs-IDs müssen im Katalog (`api/coach/core/library-data.js`) oder in `customEx` stehen.
 - Alle `live-swap` eines Requests bilden einen Auftrag mit neuer ID; er ersetzt einen früheren `coachLive`.
 - Geschrieben wird mit `commitState(uid, cur, next, {overRead: true, stamped: false})`: der Server stempelt

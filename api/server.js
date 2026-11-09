@@ -41,6 +41,8 @@ import { createHealthSync, healthConfig, habitsFetcher, keyMatches, fileMirror }
 import { coachHookConfig, applyCoachOps, searchExercises, keepCoachLive, CATALOG } from './thilo-coach.js';
 // Thilos Fork: Gym in Todoist abhaken (thilo/docs/2026-10-27-gym-todoist.md).
 import { todoistConfig, completeGym, createGymTick } from './thilo-todoist.js';
+// Thilos Fork: Trainingsdaten fürs Zielbild (thilo/docs/2026-11-09-zielbild.md).
+import { zielbildConfig, buildZielbildView, createZielbildNotify } from './thilo-zielbild.js';
 
 const PORT = +(process.env.PORT || 3000);
 const DATA = process.env.DATA_DIR || '/data';
@@ -1916,6 +1918,13 @@ const TODOIST_CFG = todoistConfig(process.env);
 const GYM = TODOIST_CFG.ok ? createGymTick({ uid: TODOIST_CFG.uid, complete: () => completeGym(TODOIST_CFG) }) : null;
 console.log(GYM ? `thilo-todoist: an (Nutzer ${TODOIST_CFG.uid}, Aufgabe „${TODOIST_CFG.title}“)` : `thilo-todoist: aus (${TODOIST_CFG.reason})`);
 
+// Thilos Fork: Trainingsdaten fürs Zielbild. GET /api/thilo/zielbild?key=… liefert die Sicht
+// (thilo-zielbild.js); ändert ein Schreiben Plan, Routinen oder Trainings von ZIELBILD_UID, stößt
+// openGym das Zielbild an (ZIELBILD_NOTIFY_URL). Ohne Konfiguration aus.
+const ZIELBILD_CFG = zielbildConfig(process.env);
+const ZIELBILD = ZIELBILD_CFG.ok && ZIELBILD_CFG.notifyUrl ? createZielbildNotify({ uid: ZIELBILD_CFG.uid, url: ZIELBILD_CFG.notifyUrl }) : null;
+console.log(ZIELBILD_CFG.ok ? `thilo-zielbild: an (Nutzer ${ZIELBILD_CFG.uid}, Anstoß ${ZIELBILD ? 'an' : 'aus'})` : `thilo-zielbild: aus (${ZIELBILD_CFG.reason})`);
+
 // Thilos Fork: der Schreibweg von PUT /api/data, herausgezogen für thilo-health.js (Gewicht aus
 // Apple Health), damit beide denselben Code nutzen. `cur` ist der gespeicherte Zustand (readStateStrict),
 // `next` der neue (wird verändert); zwischen Lesen und diesem Aufruf darf kein `await` liegen.
@@ -1976,6 +1985,10 @@ function commitState(uid, cur, next, { overRead = false, stamped = false, coachL
   // Thilos Fork: Gym in Todoist abhaken; läuft im Hintergrund, der Schreibweg wartet nicht darauf.
   if (GYM) {
     try { GYM.onCommit(uid, cur, next); } catch (e) { console.error('thilo-todoist', e); }
+  }
+  // Thilos Fork: Zielbild anstoßen; läuft im Hintergrund wie Todoist.
+  if (ZIELBILD) {
+    try { ZIELBILD.onCommit(uid, cur, next); } catch (e) { console.error('thilo-zielbild', e); }
   }
   return { ok: true, ts: next._ts || null, rev: curRev + 1, wid: next._wid };
 }
@@ -2049,6 +2062,17 @@ async function coachHook(req, res, url) {
   if (done.error) return json(res, 400, { error: done.error });
   console.log(`thilo-coach: ${r.applied.map(a => a.op).join(', ')} → rev ${done.rev}`);
   json(res, 200, { ok: true, rev: done.rev, applied: r.applied });
+}
+
+// Thilos Fork: GET /api/thilo/zielbild?key=…, nur lesen. Im Dispatcher vor Session und CSRF;
+// nginx sperrt /api/thilo/ nach außen. Ohne Konfiguration 404.
+function zielbildHook(req, res, url) {
+  if (!ZIELBILD_CFG.ok || req.method !== 'GET') return json(res, 404, { error: 'not found' });
+  if (!keyMatches(url.searchParams.get('key'), ZIELBILD_CFG.key)) return json(res, 403, { error: 'forbidden' });
+  const S = readStateStrict(ZIELBILD_CFG.uid);
+  if (S === UNREADABLE) { console.error('thilo-zielbild: state unreadable for', ZIELBILD_CFG.uid); return json(res, 503, { error: 'state unreadable' }); }
+  if (!S) return json(res, 404, { error: 'kein Zustand für diesen Nutzer' });
+  json(res, 200, buildZielbildView(S));
 }
 
 const routes = {
@@ -2758,6 +2782,7 @@ const server = http.createServer(async (req, res) => {
   // Thilos Fork: der Health-Hook prüft seinen eigenen Schlüssel, vor Session und CSRF.
   if (url.pathname === '/api/thilo/health-hook') return healthHook(req, res, url);
   if (url.pathname === '/api/thilo/coach' || url.pathname === '/api/thilo/coach/exercises') return coachHook(req, res, url);
+  if (url.pathname === '/api/thilo/zielbild') return zielbildHook(req, res, url);
   let key = req.method + ' ' + url.pathname;
   // The one route with a parameter in its path. Mapped onto its template key here so the table
   // above stays a plain lookup, and so csrfOk and the catch-all see one name for every file.

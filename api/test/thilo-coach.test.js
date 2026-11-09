@@ -168,6 +168,46 @@ test('alles oder nichts: eine fehlerhafte op verwirft alle', () => {
   assert.equal(JSON.stringify(S), before);
 });
 
+// 5216 sprint (body weight, cardio), 3666 walking on incline treadmill (cardio).
+test('add-routine: neue Routine mit Grundeinstellungen wie in der App, cfg darüber', () => {
+  const r = applyCoachOps(base(), [{ op: 'add-routine', name: ' Sprints ', emoji: 'figureRun', exercises: [
+    { exId: '5216', cfg: { mode: 'time', sets: 6, sec: 15, note: 'Bergsprint' } },
+  ] }, { op: 'add-routine', name: 'Laufband', exercises: [{ exId: '3666', cfg: { min: 30, speed: 5 } }, { exId: '0001' }] }],
+  CATALOG, { ...opts, newId: (() => { let n = 0; return () => `neu${++n}`; })() });
+  assert.ok(!r.error, r.error);
+  const [s, l] = r.next.routines.slice(2);
+  assert.deepEqual(s, { id: 'neu1', name: 'Sprints', emoji: 'figureRun', ex: [{ id: '5216', sets: 6, sec: 15, weight: 0, mode: 'time', bodyweight: true, note: 'Bergsprint' }] });
+  assert.deepEqual(l, { id: 'neu2', name: 'Laufband', emoji: 'figureStrength', ex: [{ id: '3666', sets: 1, min: 30, speed: 5 }, { id: '0001', sets: 3, reps: 10, weight: 0, mode: 'reps', bodyweight: true }] });
+  assert.deepEqual(r.applied[0].exercises.map(e => e.exId), ['5216']);
+  assert.equal(r.applied[0].routineId, 'neu1');
+});
+
+test('add-routine: Fehler bei doppeltem Namen, unbekannter Übung, falschem Symbol oder cfg', () => {
+  const add = (o) => applyCoachOps(base(), [{ op: 'add-routine', name: 'Neu', exercises: [{ exId: '5216' }], ...o }], CATALOG, opts).error;
+  assert.match(add({ name: 'push' }), /gibt es schon/);
+  assert.match(add({ name: '' }), /name/);
+  assert.match(add({ exercises: [] }), /exercises/);
+  assert.match(add({ exercises: [{ exId: 'gibtsnicht' }] }), /weder im Katalog/);
+  assert.match(add({ exercises: [{ exId: '5216' }, { exId: '5216' }] }), /doppelt/);
+  assert.match(add({ emoji: 'crown' }), /emoji/);
+  assert.match(add({ exercises: [{ exId: '5216', cfg: { mode: 'schnell' } }] }), /cfg.mode/);
+  assert.match(add({ exercises: [{ exId: '5216', cfg: { sec: 0 } }] }), /cfg.sec/);
+  assert.equal(base().routines.length, 2);
+});
+
+test('set-week: setzt oder leert einen Wochentag, Routinen müssen existieren', () => {
+  const r = applyCoachOps(base(), [
+    { op: 'set-week', weekday: 3, routineIds: ['r2', 'r1'] },
+    { op: 'set-week', weekday: 4, routineIds: [] },
+  ], CATALOG, opts);
+  assert.ok(!r.error, r.error);
+  assert.deepEqual(r.next.week, { 1: 'r1', 3: ['r2', 'r1'] });
+  assert.deepEqual(r.applied[0].routines, ['Pull', 'Push']);
+  assert.match(applyCoachOps(base(), [{ op: 'set-week', weekday: 7, routineIds: [] }], CATALOG, opts).error, /weekday/);
+  assert.match(applyCoachOps(base(), [{ op: 'set-week', weekday: 2, routineIds: ['rx'] }], CATALOG, opts).error, /nicht gefunden/);
+  assert.match(applyCoachOps(base(), [{ op: 'set-week', weekday: 2, routineIds: ['r1', 'r1'] }], CATALOG, opts).error, /doppelt/);
+});
+
 test('ops wirken nacheinander: Tausch, dann Änderung an der neuen Übung', () => {
   const r = applyCoachOps(base(), [
     { op: 'replace-exercise', routineId: 'r1', exId: '0334', newExId: '0584' },

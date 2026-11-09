@@ -35,6 +35,7 @@ export function coachHookConfig(env = process.env) {
 export const CATALOG = {
   has: id => typeof id === 'string' && LIB_BY_ID.has(id),
   name: id => DE_NAMES[id] || LIB_BY_ID.get(id)?.n || null,
+  info: id => { const e = LIB_BY_ID.get(id); return e ? { bp: e.bp || null, eq: e.eq || null } : null; },
   entries: LIBRARY.map(e => ({ id: e.id, name: DE_NAMES[e.id] || e.n, en: e.n, equipment: e.eq || null, muscles: e.tg || null, bodyPart: e.bp || null })),
 };
 
@@ -79,7 +80,15 @@ export function searchExercises(q, S, catalog = CATALOG, limit = MAX_RESULTS) {
 /* ---------- Ops ---------- */
 
 // Die Satz-Einstellungen einer Übung. `null` entfernt `repsMin`, `weight` und `note`.
-const CFG_KEYS = ['sets', 'reps', 'repsMin', 'weight', 'note'];
+// `mode`, `sec`, `min` und `speed` für gehaltene Sätze und Cardio (modeOf in frontend/src/lib/history.js).
+const CFG_KEYS = ['sets', 'reps', 'repsMin', 'weight', 'note', 'mode', 'sec', 'min', 'speed'];
+const MODES = ['reps', 'time', 'cardio'];
+// Die Symbole, die die App für Routinen kennt (GLYPHS in frontend/src/lib/glyphs.js).
+const GLYPHS = ['figureStrength', 'arm', 'abs', 'legs', 'pullup', 'dumbbell', 'barbell', 'kettlebell', 'plate', 'machine',
+  'figureRun', 'bike', 'swim', 'boxing', 'timer', 'stretch', 'moon', 'heart', 'flame', 'bolt'];
+const NAME_MAX = 80;
+const MAX_ROUTINE_EX = 30;
+const isNum = (v, lo, hi) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
 function cleanCfg(cfg, { required }) {
   if (cfg == null && !required) return { cfg: {} };
   if (!isMap(cfg)) return { error: 'cfg muss ein Objekt sein' };
@@ -100,7 +109,12 @@ function cleanCfg(cfg, { required }) {
       if (v !== null && typeof v !== 'string') return { error: 'cfg.note: Text oder null' };
       if (typeof v === 'string' && v.length > NOTE_MAX) return { error: `cfg.note: höchstens ${NOTE_MAX} Zeichen` };
       out.note = v === null || !v.trim() ? null : v.trim();
-    }
+    } else if (k === 'mode') {
+      if (!MODES.includes(v)) return { error: `cfg.mode: ${MODES.join(', ')}` };
+      out.mode = v;
+    } else if (k === 'sec') { if (!isInt(v, 1, 3600)) return { error: 'cfg.sec: ganze Zahl 1–3600' }; out.sec = v; }
+    else if (k === 'min') { if (!isNum(v, 1, 600)) return { error: 'cfg.min: Zahl 1–600' }; out.min = v; }
+    else if (k === 'speed') { if (!isNum(v, 0, 50)) return { error: 'cfg.speed: Zahl 0–50' }; out.speed = v; }
   }
   return { cfg: out };
 }
@@ -111,6 +125,16 @@ function mergeCfg(ex, cfg) {
   }
   if (Number.isInteger(ex.repsMin) && Number.isInteger(ex.reps) && ex.repsMin > ex.reps) return 'repsMin liegt über reps';
   return null;
+}
+
+// Die Grundeinstellung einer neuen Übung, wie defaultConfig in frontend/src/lib/history.js.
+const BODYWEIGHT_EQ = new Set(['body weight', 'band', 'resistance band']);
+function defaultCfg(mode, info) {
+  const m = mode || (info?.bp === 'cardio' ? 'cardio' : 'reps');
+  if (m === 'cardio') return { sets: 1, min: 20, speed: 8 };
+  const bw = BODYWEIGHT_EQ.has(info?.eq) ? { bodyweight: true } : {};
+  if (m === 'time') return { sets: 3, sec: 45, weight: 0, mode: 'time', ...bw };
+  return { sets: 3, reps: 10, weight: 0, mode: 'reps', ...bw };
 }
 
 function validDay(s) {
@@ -179,8 +203,40 @@ export function applyCoachOps(state, ops, catalog = CATALOG, { now = Date.now, n
       if (isStr(o.note)) entry.note = o.note.trim();
       live.push(entry);
       applied.push({ op: o.op, exId: o.exId, from: nameOf(o.exId), newExId: o.newExId, to: nameOf(o.newExId) });
+    } else if (o.op === 'add-routine') {
+      const name = typeof o.name === 'string' ? o.name.trim() : '';
+      if (!name || name.length > NAME_MAX) return fail(`name: Text bis ${NAME_MAX} Zeichen`);
+      if (routines.some(r => isMap(r) && String(r.name || '').trim().toLowerCase() === name.toLowerCase())) return fail(`Routine "${name}" gibt es schon`);
+      if (o.emoji != null && !GLYPHS.includes(o.emoji)) return fail(`emoji: eins von ${GLYPHS.join(', ')}`);
+      if (!Array.isArray(o.exercises) || !o.exercises.length || o.exercises.length > MAX_ROUTINE_EX) return fail(`exercises: Liste mit 1–${MAX_ROUTINE_EX} Übungen`);
+      const ex = [];
+      for (let j = 0; j < o.exercises.length; j++) {
+        const it = o.exercises[j];
+        if (!isMap(it) || !known(it.exId)) return fail(`exercises[${j}]: Übung "${isMap(it) ? it.exId : '?'}" gibt es weder im Katalog noch in customEx`);
+        if (ex.some(e => e.id === it.exId)) return fail(`exercises[${j}]: Übung "${it.exId}" doppelt`);
+        const c = cleanCfg(it.cfg, { required: false });
+        if (c.error) return fail(`exercises[${j}]: ${c.error}`);
+        const info = customs.has(it.exId) ? { bp: customs.get(it.exId).bp || null, eq: null } : catalog.info?.(it.exId) ?? null;
+        const e = { id: it.exId, ...defaultCfg(c.cfg.mode, info) };
+        const bad = mergeCfg(e, c.cfg);
+        if (bad) return fail(`exercises[${j}]: ${bad}`);
+        ex.push(e);
+      }
+      const r = { id: newId(), name, emoji: o.emoji || 'figureStrength', ex };
+      if (!Array.isArray(next.routines)) next.routines = routines;
+      routines.push(r);
+      applied.push({ op: o.op, routineId: r.id, routine: name, exercises: ex.map(e => ({ exId: e.id, name: nameOf(e.id) })) });
+    } else if (o.op === 'set-week') {
+      if (!isInt(o.weekday, 0, 6)) return fail('weekday: ganze Zahl 0–6 (0 = Sonntag)');
+      if (!Array.isArray(o.routineIds) || o.routineIds.length > 5) return fail('routineIds: Liste mit 0–5 Routinen');
+      for (const id of o.routineIds) if (!routineOf(id)) return fail(`Routine "${id}" nicht gefunden`);
+      if (new Set(o.routineIds).size !== o.routineIds.length) return fail('routineIds: Routine doppelt');
+      if (!isMap(next.week)) next.week = {};
+      if (o.routineIds.length) next.week[o.weekday] = [...o.routineIds];
+      else delete next.week[o.weekday];
+      applied.push({ op: o.op, weekday: o.weekday, routineIds: [...o.routineIds], routines: o.routineIds.map(id => routineOf(id).name) });
     } else {
-      return fail('unbekannte op (replace-exercise, update-exercise, set-day, live-swap)');
+      return fail('unbekannte op (replace-exercise, update-exercise, set-day, live-swap, add-routine, set-week)');
     }
   }
   // Alle live-swaps eines Requests bilden einen Auftrag; er ersetzt einen früheren.

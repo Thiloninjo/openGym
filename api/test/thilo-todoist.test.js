@@ -91,3 +91,12 @@ test('Auslöser: nur eigener Nutzer, nur neue Trainings, Fehler nur geloggt, nie
   assert.ok(logs.some(m => m.includes('abgehakt: [Personal] Gym')));
   assert.ok(logs.some(m => m.includes('Abhaken fehlgeschlagen: down')));
 });
+
+test('Sprints und Laufband haken „Gym“ nicht ab, ein Krafttraining daneben schon', async () => {
+  let n = 0;
+  const tick = createGymTick({ uid: 'u1', complete: async () => { n++; return []; }, log: () => {}, now: () => NOW });
+  const cur = { workouts: [] };
+  assert.equal(tick.onCommit('u1', cur, { workouts: [W('s', NOW - 1000, { name: 'Sprints' }), W('l', NOW - 900, { name: ' laufband ' })] }), null);
+  await tick.onCommit('u1', cur, { workouts: [W('s', NOW - 1000, { name: 'Sprints' }), W('k', NOW - 500, { name: 'Cut-Vorschau Mo · Oberkörper A' })] });
+  assert.equal(n, 1);
+});
