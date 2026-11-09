@@ -1,9 +1,12 @@
+import { thiloRules, RANGE_SPAN } from './thilo-rules.js'
+
 // Normalize the two bounds used by double progression.
 // `reps` is the upper bound and `repsMin` is the lower bound in persisted configs.
 export function normalizeRepRange(reps, repsMin, stride = 1) {
   const step = Number.isInteger(stride) && stride > 0 ? stride : 1
   const upper = align(positiveInt(reps, 10), step)
-  const lower = align(positiveInt(repsMin, Math.max(1, upper - 2)), step)
+  // Thilos Fork: ohne eigenes Minimum reicht der Bereich weiter nach unten (lib/thilo-rules.js).
+  const lower = align(positiveInt(repsMin, Math.max(1, upper - (thiloRules() ? RANGE_SPAN : 2))), step)
   return lower >= upper
     ? { reps: lower + step, repsMin: lower }
     : { reps: upper, repsMin: lower }

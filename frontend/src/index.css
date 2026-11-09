@@ -1371,6 +1371,12 @@ body.chips-dragging *{cursor:inherit}
    looking like the plain line it replaced, with a small icon to say it can be tapped. */
 .refline{width:100%;display:flex;align-items:flex-start;gap:6px;margin-bottom:4px;padding:0;text-align:start}
 .refline svg{flex:none;margin-top:2px;font-size:12px}
+/* Thilos Fork: Mini-Verlauf unter „Letztes Mal“ (components/ThiloMiniHistory.jsx) */
+.thilo-hist{margin:2px 0 8px;padding:8px 10px;border-radius:10px;background:var(--surface-2)}
+.thilo-hist-chart{margin:0 0 4px}
+.thilo-hist-row{display:flex;gap:8px;line-height:1.5}
+.thilo-hist-row time{flex:none;min-width:4.5em;font-variant-numeric:tabular-nums}
+.thilo-hist-more{display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:0;color:var(--acc)}
 /* an exercise kept out of progression for this session, with its undo */
 .noprog{display:flex;align-items:center;gap:7px;margin:0 0 6px;font-size:13px;line-height:1.38;color:var(--orange)}
 .noprog svg{flex:none}

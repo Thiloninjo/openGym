@@ -23,6 +23,7 @@ import { normalizeRepRange } from './rep-range.js'
 import { isPyramid } from './pyramid.js'
 import { backoffAt } from './backoff.js'
 import { ownedWeightsFor, ownedUp, ownedDeload, ownedAround } from './dumbbells.js'
+import { thiloRules } from './thilo-rules.js'
 
 export const POLICIES = ['off', 'linear', 'greyskull', 'double', 'triple', 'time']
 
@@ -101,6 +102,8 @@ export function policyFor(cfg, routine, mode) {
   const m = mode || modeOf(cfg || {})
   const allowed = POLICIES_FOR[m] || ['off']
   const pick = (cfg && cfg.prog) || (routine && routine.prog) || (m === 'reps' ? 'linear' : 'off')
+  // Thilos Fork: erst Wiederholungen, dann Gewicht (lib/thilo-rules.js).
+  if (thiloRules() && m === 'reps' && pick === 'linear') return 'double'
   return allowed.includes(pick) ? pick : 'off'
 }
 
@@ -308,15 +311,42 @@ export function readSession(entry, fallback) {
   const step = entry && entry.target ? Number(entry.target.backoffStep) || 0 : 0
   const top = step > 0 && sets.length ? Number(sets[0].w) || 0 : 0
   const heavyEnough = (s, k) => !(top > 0) || k === 0 || (Number(s.w) || 0) >= backoffAt(top, k, step) - 0.05
-  const reps = sets.map((s, k) => (s.done && heavyEnough(s, k) ? (s.r || 0) : 0))
+  // Thilos Fork: das Arbeitsgewicht statt des schwersten Satzes; schwerere Versuche darüber zählen
+  // nicht mit, und ohne sie fehlt der Satz (lib/thilo-rules.js).
+  const work = thiloRules() && !isAssisted(entry && entry.id ? { id: entry.id } : entry) ? workingWeight(sets, target, goal) : null
+  const graded = work == null ? sets : sets.filter(s => !(s.done && (Number(s.w) || 0) > work + 0.05))
+  const reps = graded.map((s, k) => (s.done && heavyEnough(s, k) ? (s.r || 0) : 0))
+  const full = work == null ? enough : graded.length >= planned
   return {
     mode, target, goal, reps,
-    weight: loadOf(entry, sets),
+    weight: work == null ? loadOf(entry, sets) : work,
     count: reps.length,                                   // the dimension bodyweight work grows (#33)
     low: reps.length ? Math.min(...reps) : 0,
     amrap: reps.length ? reps[reps.length - 1] : 0,       // Greyskull's final set
-    ok: goal > 0 && enough && reps.length > 0 && reps.every((r, k) => r >= (rowGoals ? rowGoals[k] ?? goal : goal))
+    ok: goal > 0 && full && reps.length > 0 && reps.every((r, k) => r >= (rowGoals ? rowGoals[k] ?? goal : goal))
   }
+}
+
+// Thilos Fork: das schwerste Gewicht, mit dem ein abgehakter Satz die Ziel-Wiederholungen (unteres
+// Ende des Bereichs, sonst das Ziel) geschafft hat. Hat das keiner, das Gewicht der meisten Sätze
+// (bei Gleichstand das schwerere). Ohne Last (Körpergewicht) null: dann gilt das Original.
+export function workingWeight(sets, target, goal) {
+  const done = sets.filter(s => s.done && (Number(s.w) || 0) > 0)
+  if (!done.length) return null
+  const need = Number(target?.repsMin) > 0 ? Number(target.repsMin) : goal
+  const hit = done.filter(s => (Number(s.r) || 0) >= need)
+  if (hit.length) return Math.max(...hit.map(s => Number(s.w)))
+  const count = new Map()
+  for (const s of done) count.set(Number(s.w), (count.get(Number(s.w)) || 0) + 1)
+  return [...count].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0]
+}
+
+// Thilos Fork: das Gewicht, das die Session vorgegeben hatte, wenn es von der Progression kam (vom
+// Plan abweichend). Ein Plan-Gewicht sagt nichts, es stand oft nur beim Anlegen drin.
+const prescribedOf = session => {
+  const w = Number(session?.target?.weight) || 0
+  const planned = session?.planned
+  return w > 0 && planned && (planned.weight ?? null) !== w ? w : 0
 }
 
 /**
@@ -534,7 +564,8 @@ export function nextPrescription(S, cfg, routine) {
     return { policy, kind: 'hold', sec: last.goal || cfg.sec, why: ['Came up short last time. Same target again.'] }
   }
 
-  const w = last.weight
+  // Thilos Fork: ein schlechter Tag mit weniger Gewicht als vorgegeben senkt das nächste nicht.
+  const w = thiloRules() && !assisted && last.weight > 0 ? Math.max(last.weight, prescribedOf(last)) : last.weight
   // Bodyweight work carries no external load, so there is nothing to add or take away —
   // "deload your push-ups to 2.5 kg" is not advice. Progress in reps instead. This runs ahead
   // of the individual policies because it is true for all of them. The trigger is work with no
@@ -683,7 +714,9 @@ export function nextPrescription(S, cfg, routine) {
     // from before the exercise moved to double progression. Hitting it is compliance with that
     // session, not "reached the top". Double progression must not add weight until every set
     // actually reaches the top of the range (issue #278).
-    if (last.ok && last.low >= top) {
+    // Thilos Fork: leichter als vorgegeben trainiert, dann zählen diese Wiederholungen nicht.
+    const lighter = thiloRules() && w > last.weight
+    if (last.ok && last.low >= top && !lighter) {
       if (topped(w)) return toppedOut(w, { reps: top })
       const up = harder(w, inc)
       // Over owned bells the step is whatever the next one is: 9 → 11 is 2 kg, 18 → 19 is 1.
@@ -706,7 +739,10 @@ export function nextPrescription(S, cfg, routine) {
           : ['Stuck for {0} sessions. Deload to {1} {2}.', stalls, dw, unit]
       }
     }
-    const aim = Math.min(top, Math.max(bottom, last.low + repStep(cfg)))
+    const climb = lighter ? bottom : Math.min(top, Math.max(bottom, last.low + repStep(cfg)))
+    // Thilos Fork: ein schlechter Tag senkt das Ziel nicht; es bleibt bei dem der letzten Session.
+    const before = thiloRules() ? Math.min(top, Number(last.target?.reps) || 0) : 0
+    const aim = Math.max(climb, before)
     return { policy, kind: 'hold', weight: w, reps: aim, why: ['Same weight, aim for {0} reps this time.', aim] }
   }
 
