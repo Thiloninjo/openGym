@@ -1,15 +1,15 @@
 # Thilos Fork: trägt beim Codemagic-Build die Fork-Bausteine ins Xcode-Projekt ein (es gibt keinen
 # Mac, auf dem man das in Xcode klicken könnte). Das eingecheckte project.pbxproj bleibt wie im
 # Original; jeder Schritt hier prüft selbst, ob er schon erledigt ist, und lässt sich wiederholen.
-#  - App: ThiloBridgeViewController (meldet die lokalen Plugins an), TrainingLivePlugin, TrainingAudio
-#    und die gemeinsamen Attribute der Live-Aktivität.
+#  - App: ThiloBridgeViewController (meldet die lokalen Plugins an), TrainingLivePlugin, TrainingAudio,
+#    ThiloHapticsPlugin und die gemeinsamen Attribute der Live-Aktivität.
 #  - PrintPlugin.m fliegt aus dem Build: PrintPlugin.swift erfüllt CAPBridgedPlugin selbst, die
 #    CAP_PLUGIN-Kategorie würde dieselben Methoden noch einmal setzen.
 #  - Widget-Erweiterung RestWidget (Live-Aktivität des Trainings).
 # Aufruf: ruby thilo/ios/add-rest-widget.rb frontend/ios/App/App.xcodeproj <app-bundle-id>
 require 'xcodeproj'
 
-APP_FILES = %w[ThiloBridgeViewController.swift TrainingLivePlugin.swift TrainingAudio.swift].freeze
+APP_FILES = %w[ThiloBridgeViewController.swift TrainingLivePlugin.swift TrainingAudio.swift ThiloHapticsPlugin.swift].freeze
 DROPPED_APP_FILES = %w[PrintPlugin.m RestActivityPlugin.swift RestActivityPlugin.m].freeze
 
 proj_path, bundle_id = ARGV

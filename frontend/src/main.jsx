@@ -8,10 +8,15 @@ import { startNativeKeyboard } from './lib/native-keyboard.js'
 import './index.css'
 // Thilos Fork: mehr Bewegung (thilo-motion.css)
 import './thilo-motion.css'
+// Thilos Fork: Powerfit-Look (thilo/docs/2026-11-09-powerfit-design.md)
+import './thilo-theme.css'
 // Thilos Fork: eigene Progressionsregeln (lib/thilo-rules.js)
 import { setThiloRules } from './lib/thilo-rules.js'
+// Thilos Fork: Haptik bei jedem Tap (lib/thilo-haptics.js)
+import { installHaptics } from './lib/thilo-haptics.js'
 
 setThiloRules(true)
+installHaptics()
 
 // App.jsx restores per-route scroll itself; the browser's own attempt races it.
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual'

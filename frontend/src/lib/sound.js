@@ -169,8 +169,12 @@ export function setVibrate(on) { buzz = on !== false }
 // Offered where the browser can buzz at all: iOS has no navigator.vibrate. The Android app needs
 // android.permission.VIBRATE in its manifest, without which the WebView drops every call.
 export const vibrateSupported = () => typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'
+// Thilos Fork: lib/thilo-haptics.js übernimmt den Impuls (auf dem iPhone die Taptic Engine).
+let buzzHook = null
+export function setBuzzHook(fn) { buzzHook = typeof fn === 'function' ? fn : null }
 export function vibrate(p) {
   if (!buzz) return
+  if (buzzHook) { try { buzzHook(p) } catch (e) { /* */ } return }
   try { navigator.vibrate && navigator.vibrate(p) } catch (e) { /* */ }
 }
 

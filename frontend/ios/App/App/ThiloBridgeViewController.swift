@@ -13,5 +13,6 @@ class ThiloBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(TrainingLivePlugin())
         bridge?.registerPluginInstance(PrintPlugin())
+        bridge?.registerPluginInstance(ThiloHapticsPlugin())
     }
 }

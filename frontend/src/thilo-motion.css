@@ -70,3 +70,54 @@
 /* Fortschrittsbalken und Auswahl-Segmente etwas weicher. */
 .seg-sel{transition:transform 420ms var(--spring),width var(--med) var(--ease)!important}
 .wprog i{transition:width 600ms var(--ease)}
+
+/* --- Powerfit (09.11.2026): Ease überall. thilo/docs/2026-11-09-powerfit-design.md --- */
+
+/* Farben, Flächen und Schatten gleiten statt zu springen. Ohne transform: was beim Wischen oder
+   Ziehen per JS bewegt wird, soll dem Finger ohne Verzögerung folgen. */
+a,.tag,.lrow-i,.th-link{
+  transition-property:background-color,color,box-shadow,border-color,opacity;
+  transition-duration:260ms;transition-timing-function:var(--ease);
+}
+.field,.input{transition:box-shadow 240ms var(--ease),background-color 240ms var(--ease)}
+.iconbtn{transition:transform 320ms var(--spring),background-color 220ms var(--ease),color 220ms var(--ease)}
+
+/* Eindrücken und federnd zurück, auch für Kacheln, Tage und Stepper-Knöpfe. */
+.th-q,.wday,.tile.tappable,.stp button,.today-row{
+  transition:transform 320ms var(--spring),background-color 220ms var(--ease),color 220ms var(--ease),box-shadow 260ms var(--ease);
+}
+.th-q:active,.wday:active,.tile.tappable:active,.today-row:active{transform:scale(.95);transition-duration:90ms}
+.stp button:active{transform:scale(.86);transition-duration:90ms}
+.th-play{transition:transform 360ms var(--spring),background-color 260ms var(--ease),box-shadow 260ms var(--ease)}
+.th-today:active .th-play{transform:scale(.88);transition-duration:90ms}
+
+/* Satz abhaken: der Haken poppt, die Zeile blendet weich ab. */
+@keyframes og-check{0%{transform:scale(.55)}55%{transform:scale(1.18)}100%{transform:none}}
+.chk.on{animation:og-check 440ms var(--spring)}
+.chk.on .icn{animation:og-fade 260ms ease both}
+.setrow,.setrow-side{transition:opacity 320ms var(--ease)}
+.setrow.done .n{transition:background-color 260ms var(--ease),color 260ms var(--ease)}
+
+/* Schalter federn. */
+.sw{transition:background-color 300ms var(--ease)}
+.sw .knob{transition:transform 440ms var(--spring),width 200ms var(--ease),box-shadow 200ms var(--ease)}
+
+/* Auswahl-Pill und Tab-Kapsel federn etwas mehr. */
+.seg button{transition:color 260ms var(--ease),opacity 160ms var(--ease)}
+
+/* Startseite: Headline Zeile für Zeile, Kennzahlen und Schnellzugriff gestaffelt. */
+@keyframes og-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.th-top{animation:og-fade 420ms var(--ease) both}
+.th-head>span{animation:og-rise 600ms var(--ease) both}
+.th-head>span:nth-child(2){animation-delay:80ms}
+.th-stat{animation:og-row 460ms var(--ease) both}
+.th-stat:nth-child(1){animation-delay:140ms}
+.th-stat:nth-child(2){animation-delay:200ms}
+.th-stat:nth-child(3){animation-delay:260ms}
+.th-q{animation:og-in 480ms var(--ease) both}
+.th-q:nth-child(1){animation-delay:120ms}
+.th-q:nth-child(2){animation-delay:180ms}
+.th-q:nth-child(3){animation-delay:240ms}
+.th-sec{animation:og-fade 420ms var(--ease) both}
+@keyframes og-glow{0%,100%{box-shadow:var(--glow)}50%{box-shadow:0 10px 34px -8px color-mix(in srgb,var(--acc) 85%,transparent)}}
+.th-today:not(.done):not(.rest):not(.live) .th-play{animation:og-glow 2.6s ease-in-out 900ms infinite}

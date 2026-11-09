@@ -171,7 +171,8 @@ describe('Settings: your own accent colour', () => {
   it('ignores a value that is not a colour', () => {
     mocks.S.accent = 'custom'; mocks.S.accentCustom = 'red;}'
     mount()
-    expect(host.querySelector('.lrow-v').textContent).toBe('Green')
+    // Thilos Fork: der Standard-Akzent heißt jetzt Lime (lib/format.js)
+    expect(host.querySelector('.lrow-v').textContent).toBe('Lime')
     expect(own().classList.contains('unset')).toBe(true)
   })
 

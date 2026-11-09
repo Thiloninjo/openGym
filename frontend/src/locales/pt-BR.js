@@ -1407,6 +1407,10 @@ export const PT_BR_OVERRIDES = {
   'My exercises': 'Meus exercícios',
   'Your own exercises': 'Seus próprios exercícios',
   'Exercises from your routines and favourites will show up here. Until then, here is the whole library.': 'Os exercícios das suas rotinas e favoritos vão aparecer aqui. Até lá, você vê a biblioteca completa.',
+  // Thilos Fork: Startseite im Powerfit-Look (views/ThiloHome.jsx)
+  'running': 'em andamento',
+  'Recover': 'Recupere-se',
+  'Plan the day': 'Planejar o dia',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

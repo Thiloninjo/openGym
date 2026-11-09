@@ -1,0 +1,206 @@
+/* Thilos Fork: Powerfit-Look (thilo/docs/2026-11-09-powerfit-design.md).
+   Fast schwarz, Neon-Lime, kondensierte Headlines in Großbuchstaben, Pills und eine schwebende
+   Tab-Leiste. Liegt als eigene Datei nach index.css und thilo-motion.css, damit Updates vom
+   Original ohne Konflikte übernommen werden können. */
+
+@font-face{
+  font-family:'Barlow Condensed';font-style:normal;font-weight:600;font-display:swap;
+  src:url(./thilo-fonts/barlow-condensed-600.woff2) format('woff2');
+}
+@font-face{
+  font-family:'Barlow Condensed';font-style:normal;font-weight:700;font-display:swap;
+  src:url(./thilo-fonts/barlow-condensed-700.woff2) format('woff2');
+}
+
+/* ---------------------------------------------------------------- tokens -- */
+:root{
+  --display:'Barlow Condensed','SF Pro Display',-apple-system,system-ui,sans-serif;
+  --r-card:20px; --r-lg:22px; --r-xl:28px;
+  --glow:0 10px 28px -12px color-mix(in srgb,var(--acc) 70%,transparent);
+}
+:root:not([data-theme="light"]){
+  --bg:#0a0a0a;
+  --bg-el:#121212;
+  --surface:#161616;
+  --surface-2:#202020;
+  --surface-3:#2c2c2c;
+  --sep:rgba(255,255,255,.08);
+  --sep-op:rgba(255,255,255,.06);
+  --card-edge:inset 0 0 0 1px rgba(255,255,255,.035);
+}
+:root[data-theme="light"]{--card-edge:none}
+
+/* Neon-Lime ist der Standard-Akzent; das bisherige Grün bleibt als „green“ wählbar. */
+:root[data-accent="lime"]{--acc:#d4f53c;--acc-2:#b9d927;--on-acc:#0a0a0a;--knob-ring:rgba(0,0,0,.28)}
+:root[data-theme="light"][data-accent="lime"]{--acc:#5f7a00;--acc-2:#4a5f00;--on-acc:#fff;--knob-ring:transparent}
+:root[data-accent="green"]{--acc:var(--green);--acc-2:#248a3d;--on-acc:#000}
+:root[data-theme="light"][data-accent="green"]{--on-acc:#000}
+
+body{background:var(--bg)}
+
+/* ------------------------------------------------------------ Typografie -- */
+.hdr h1{
+  font-family:var(--display);font-weight:700;text-transform:uppercase;
+  font-size:40px;line-height:.98;letter-spacing:.004em;
+}
+@media (max-width:420px){.hdr h1{font-size:36px}}
+.hdr .sub{margin-top:6px}
+/* Alle Seitentitel, auch die ohne .hdr (Einstellungen, Verlauf, Coach, Login). */
+#app h1,.ob-h{font-family:var(--display);font-weight:700;text-transform:uppercase;letter-spacing:.004em;line-height:1}
+.sp-root-title,.sp-title{font-size:40px}
+.card .big,.tile .v{font-family:var(--display);font-weight:700;letter-spacing:.005em}
+.card .big{font-size:36px}
+.tile .v{font-size:30px}
+.whdr-name{font-family:var(--display);font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.01em}
+.stp .num{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.01em}
+.setrow .n{font-family:var(--display);font-weight:700}
+.card h2{font-size:15px;font-weight:600;color:var(--label);letter-spacing:-.008em}
+h4.sec{font-size:15px;font-weight:600;color:var(--label);margin:24px 0 10px}
+.sheet h3{font-family:var(--display);font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:.008em;line-height:1.05}
+
+/* ---------------------------------------------------------- Flächen ------ */
+.card,.sect-b,.tile{border-radius:var(--r-card);box-shadow:var(--card-edge)}
+.card{padding:18px;margin-bottom:14px}
+.sheet{border-radius:var(--r-xl) var(--r-xl) 0 0;padding-top:10px}
+.sheet .grab{width:40px;background:var(--label-3)}
+.center{border-radius:24px}
+#timer{border-radius:24px;box-shadow:var(--card-edge),0 16px 40px -10px rgba(0,0,0,.7)}
+
+/* ---------------------------------------------------------------- Buttons -- */
+.btn,.btn.sm,.btn.xs{border-radius:999px}
+.btn.primary{box-shadow:var(--glow);font-weight:700}
+.btn.primary:active{box-shadow:none}
+.tag{border-radius:999px;padding:3px 9px}
+.iconbtn{background:var(--surface-2)}
+/* Symbol-Kacheln in Lime (ohne eigene Farbe) bekommen dunkle Symbole statt weißer. */
+.lrow-i:not([style]),.lrow-i[style*="--acc"]{color:var(--on-acc)}
+
+/* Auswahl wie im Mockup: Lime-Pill auf dunkler Spur. */
+.seg{border-radius:999px;padding:3px;background:var(--surface-2)}
+.seg-sel{top:3px;bottom:3px;inset-inline-start:3px;width:calc((100% - 6px)/var(--n));border-radius:999px;background:var(--acc);box-shadow:var(--glow)}
+.seg button.on{color:var(--on-acc);font-weight:600}
+.seg button{min-height:32px}
+.chip{border-radius:999px}
+
+/* Haken und Satznummer: Lime mit Leuchten. */
+.chk.on{box-shadow:var(--glow)}
+.setrow.done{opacity:.5}
+
+/* Felder: weicher Ring beim Fokus. */
+.field,.input{border-radius:14px}
+.field:focus,.input:focus{box-shadow:inset 0 0 0 1.5px var(--acc),0 0 0 4px color-mix(in srgb,var(--acc) 18%,transparent)}
+.stp{border-radius:14px}
+.wprog{height:6px}
+.wprog i{box-shadow:0 0 12px color-mix(in srgb,var(--acc) 60%,transparent)}
+
+/* ------------------------------------------------------- Tab-Leiste ------ */
+/* Schwebt als abgerundete Leiste über dem Inhalt, der aktive Tab ist Lime. */
+#tabbar{
+  inset-inline-start:12px;inset-inline-end:12px;bottom:max(10px,calc(var(--sab) - 10px));
+  padding:8px 6px 7px;border-radius:28px;border-top:0;
+  background:color-mix(in srgb,#141414 92%,transparent);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06),0 18px 40px -12px rgba(0,0,0,.8);
+}
+:root[data-theme="light"] #tabbar{background:rgba(255,255,255,.94);box-shadow:inset 0 0 0 1px rgba(0,0,0,.06),0 18px 40px -16px rgba(0,0,0,.25)}
+#tabbar button{font-size:10.5px;font-weight:600}
+#tabbar .tab-glow{top:4px;height:48px;border-radius:20px;background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#tabbar button.start{margin-top:-30px}
+#tabbar button.start .cir{width:56px;height:56px;box-shadow:0 0 0 5px var(--bg),var(--glow)}
+#tabbar button.start.rec .cir{box-shadow:0 0 0 5px var(--bg),0 10px 28px -12px var(--orange)}
+.tab-dot{box-shadow:0 0 0 2px #141414}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  #tabbar{background:#141414}
+}
+
+/* ------------------------------------------------------- Wochenleiste ---- */
+/* Kalender-Kacheln wie im Mockup: dunkle Quadrate, heute in Lime. */
+.week{gap:6px}
+.wday{background:var(--surface-2);border-radius:14px;padding:8px 0 7px}
+.wday .lbl{font-size:10.5px;color:var(--label-2)}
+.wday .num{font-family:var(--display);font-weight:700;font-size:20px;margin:2px 0 3px}
+.wday.today{background:var(--acc);color:var(--on-acc);box-shadow:var(--glow)}
+.wday.today .lbl{color:color-mix(in srgb,var(--on-acc) 70%,transparent)}
+.wday.today .num{background:none;color:inherit;width:auto;height:auto;margin:2px 0 3px;display:block;font-weight:700}
+.wday.today .dot.done,.wday.today .dot.plan{background:var(--on-acc)}
+.wday:active{background:var(--surface-3)}
+.wday.today:active{background:var(--acc-2)}
+
+/* ============================================================ Startseite == */
+.th-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 18px}
+.th-hello{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:500;min-width:0}
+.th-hello>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.th-ava{
+  width:42px;height:42px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--surface-2);color:var(--acc);font-family:var(--display);font-weight:700;font-size:18px;
+  box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--acc) 45%,transparent);
+}
+.th-head{
+  font-family:var(--display);font-weight:700;text-transform:uppercase;
+  font-size:46px;line-height:.94;letter-spacing:.004em;margin:0 0 20px;
+  display:flex;flex-direction:column;overflow-wrap:anywhere;
+}
+.th-head-2{color:var(--acc)}
+@media (max-width:380px){.th-head{font-size:40px}}
+
+.th-card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.th-card-h h2{margin:0}
+.th-link{color:var(--acc);font-size:14px;font-weight:600;padding:4px 2px}
+.th-week-body{display:flex;align-items:center;gap:18px}
+.th-ring{position:relative;width:118px;height:118px;flex:none}
+.th-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.th-ring circle{fill:none;stroke-width:10}
+.th-ring-bg{stroke:var(--surface-3)}
+.th-ring-fg{
+  stroke:var(--acc);stroke-linecap:round;
+  transition:stroke-dashoffset 1100ms cubic-bezier(.22,1,.36,1);
+  filter:drop-shadow(0 0 6px color-mix(in srgb,var(--acc) 55%,transparent));
+}
+.th-ring-v{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.th-ring-v b{font-family:var(--display);font-weight:700;font-size:32px;line-height:1}
+.th-ring-v span{font-size:11px;color:var(--label-2);margin-top:2px}
+.th-stats{display:flex;flex-direction:column;gap:12px;min-width:0;flex:1}
+.th-stat{display:flex;align-items:center;gap:10px;min-width:0}
+.th-stat-i{
+  width:32px;height:32px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--surface-2);color:var(--acc);font-size:16px;
+}
+.th-stat-l{font-size:11.5px;color:var(--label-2);line-height:1.2}
+.th-stat-v{font-family:var(--display);font-weight:700;font-size:20px;line-height:1.1;white-space:nowrap}
+.th-strip{margin-top:16px}
+.th-strip-h{margin-bottom:10px}
+.th-strip-h .iconbtn{width:30px;height:30px;font-size:15px}
+.th-strip-h .small{font-weight:500}
+
+.th-sec{font-size:15px;font-weight:600;margin:22px 0 10px}
+.th-quick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:6px}
+.th-q{
+  display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;
+  padding:16px 6px 14px;border-radius:18px;background:var(--surface);box-shadow:var(--card-edge);
+  min-width:0;
+}
+.th-q>.icn{font-size:24px;color:var(--acc);margin-bottom:2px}
+.th-q-t{font-size:14px;font-weight:600;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.th-q-s{font-size:11.5px;color:var(--label-2);line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.th-q:active{background:var(--surface-2)}
+
+.th-today{display:flex;align-items:center;gap:14px;padding:12px 12px 12px 12px;cursor:pointer;margin-bottom:6px}
+.th-today-img{
+  width:84px;height:84px;border-radius:16px;overflow:hidden;flex:none;display:grid;place-items:center;
+  background:var(--surface-2);color:var(--acc);font-size:30px;
+}
+.th-today-img .thumb{width:84px;height:84px;border-radius:16px}
+.th-today-m{flex:1;min-width:0}
+.th-today-t{
+  font-family:var(--display);font-weight:700;font-size:22px;line-height:1.05;text-transform:uppercase;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;
+}
+.th-today-s{font-size:13px;color:var(--label-2);margin-top:4px;font-variant-numeric:tabular-nums}
+.th-play{
+  width:48px;height:48px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:var(--acc);color:var(--on-acc);font-size:20px;--icon-stroke:2.4;box-shadow:var(--glow);
+}
+.th-today.live .th-play{background:var(--orange);color:#000;box-shadow:0 10px 28px -12px var(--orange)}
+.th-today.live .th-today-s{color:var(--orange)}
+.th-today.done .th-play{background:color-mix(in srgb,var(--acc) 18%,transparent);color:var(--acc);box-shadow:none}
+.th-today.rest .th-play{background:var(--surface-2);color:var(--label);box-shadow:none}
+.th-alt{display:flex;justify-content:center;margin-bottom:10px}
