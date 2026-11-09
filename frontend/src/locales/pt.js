@@ -164,6 +164,8 @@ export default {
   'Workout complete!': 'Treino concluído!',
   'Duration': 'Duração',
   'Volume': 'Volume',
+  'Steps': 'Passos',
+  '{0} steps': '{0} passos',
   'PRs': 'Recordes',
   'New PR:': 'Novo recorde:',
   'Nice!': 'Boa!',

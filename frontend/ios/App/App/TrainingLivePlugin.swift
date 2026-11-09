@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 import UIKit
+import CoreMotion
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
@@ -15,6 +16,9 @@ import ActivityKit
  *   Ende (bzw. nach der Ansage), zum Pausenende eine Ansage per Stimme, andere Musik wird solange
  *   leiser. Eine Ansage, die mehr als 5 s zu spät käme, entfällt. Der Zeitgeber dafür läuft hier
  *   nativ, nicht im WebView (der wird im Hintergrund gedrosselt).
+ * - Schritte (CoreMotion): ab Trainingsbeginn zählt der Schrittzähler des iPhones mit. Jeder neue Stand
+ *   geht als Ereignis „steps“ ({ steps, from }) an JS und, höchstens alle 15 s, in die Live-Aktivität.
+ *   Gezählt wird immer ab Trainingsbeginn; nach einer Pause der App holt CoreMotion den Rest nach.
  *
  * Angemeldet in ThiloBridgeViewController (Capacitor 7: registerPluginInstance).
  * Aus JS (lib/thilo-ios-training.js):
@@ -50,6 +54,7 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
         var restTitle = "Pause"
         var doneTitle = "Pause vorbei"
         var ready = false
+        var steps: Int?
     }
 
     // Entsteht mit dem Plugin in ThiloBridgeViewController.capacitorDidLoad, also auf dem Main-Thread.
@@ -63,6 +68,13 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
     private let keepAliveLinger: TimeInterval = 60
     /// Später als das nach dem Pausenende wird nichts mehr angesagt (App war angehalten).
     private let speechLateness: TimeInterval = 5
+
+    private let pedometer = CMPedometer()
+    /// Ab hier zählt der Schrittzähler gerade (Trainingsbeginn); nil, solange er nicht läuft.
+    private var stepsFrom: Date?
+    private var lastStepsPush = Date.distantPast
+    /// Die Live-Aktivität bekommt neue Schritte höchstens so oft (iOS drosselt häufige Updates).
+    private let stepsPushEvery: TimeInterval = 15
 
     override public func load() {
         let nc = NotificationCenter.default
@@ -80,6 +92,7 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
             if let s = startedAt { self.live.startedAt = s } else if !self.training { self.live.startedAt = Date() }
             self.training = true
             self.apply(fields)
+            self.startSteps(from: self.live.startedAt)
             self.push()
             call.resolve()
         }
@@ -100,6 +113,7 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             self.training = false
             self.cancelRestTimer()
+            self.stopSteps()
             self.live = Live()
             self.audio.stopKeepAlive()
             self.push()
@@ -199,7 +213,50 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
     // Auf dem Weg in den Hintergrund: steht ein Pausenende aus, Kategorie und Schleife sicherstellen,
     // sonst wird die App angehalten und die Ansage kommt nicht.
     @objc private func leavingForeground() {
-        DispatchQueue.main.async { if self.restTimer != nil { self.audio.startKeepAlive() } }
+        DispatchQueue.main.async {
+            if self.restTimer != nil { self.audio.startKeepAlive() }
+            // Den letzten Schrittstand mitnehmen, der wegen der Drosselung noch nicht angezeigt wird.
+            if self.training && self.live.steps != nil { self.lastStepsPush = Date(); self.push() }
+        }
+    }
+
+    // MARK: Schritte
+
+    private func startSteps(from start: Date) {
+        guard CMPedometer.isStepCountingAvailable() else { return }
+        if let f = stepsFrom, abs(f.timeIntervalSince(start)) < 1 {
+            // Zählt schon (z. B. die Seite wurde neu geladen): den Stand gleich wieder melden.
+            if let n = live.steps { notifyListeners("steps", data: ["steps": n, "from": f.timeIntervalSince1970 * 1000], retainUntilConsumed: true) }
+            return
+        }
+        pedometer.stopUpdates()
+        stepsFrom = start
+        live.steps = nil
+        // Liefert die Summe ab `start`, auch rückwirkend: nach einem Neustart der App mitten im
+        // Training stimmt die Zahl sofort wieder. Beim ersten Mal fragt iOS nach „Bewegung & Fitness“.
+        pedometer.startUpdates(from: start) { [weak self] data, error in
+            guard error == nil, let n = data?.numberOfSteps.intValue else {
+                if let e = error { NSLog("%@", "[TrainingLive] Schritte: \(e.localizedDescription)") }
+                return
+            }
+            DispatchQueue.main.async { self?.gotSteps(n, from: start) }
+        }
+    }
+
+    private func gotSteps(_ n: Int, from start: Date) {
+        guard training, stepsFrom == start, n != live.steps else { return }
+        let first = live.steps == nil
+        live.steps = n
+        notifyListeners("steps", data: ["steps": n, "from": start.timeIntervalSince1970 * 1000])
+        if first || Date().timeIntervalSince(lastStepsPush) >= stepsPushEvery {
+            lastStepsPush = Date()
+            push()
+        }
+    }
+
+    private func stopSteps() {
+        pedometer.stopUpdates()
+        stepsFrom = nil
     }
 
     // MARK: Felder
@@ -249,7 +306,7 @@ public class TrainingLivePlugin: CAPPlugin, CAPBridgedPlugin {
         RestActivityAttributes.ContentState(
             name: live.name, exercise: live.exercise, setNo: live.setNo, setCount: live.setCount,
             restEndsAt: live.restEndsAt, restTotal: live.restTotal, restLeft: live.restLeft,
-            restTitle: live.restTitle, doneTitle: live.doneTitle, ready: live.ready)
+            restTitle: live.restTitle, doneTitle: live.doneTitle, ready: live.ready, steps: live.steps)
     }
 
     @available(iOS 16.2, *)

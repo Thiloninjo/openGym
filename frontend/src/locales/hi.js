@@ -164,6 +164,8 @@ export default {
   'Workout complete!': 'वर्कआउट पूरा!',
   'Duration': 'अवधि',
   'Volume': 'वॉल्यूम',
+  'Steps': 'कदम',
+  '{0} steps': '{0} कदम',
   'PRs': 'रिकॉर्ड',
   'New PR:': 'नया रिकॉर्ड:',
   'Nice!': 'बहुत बढ़िया!',

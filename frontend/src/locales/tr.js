@@ -164,6 +164,8 @@ export default {
   'Workout complete!': 'Antrenman tamamlandı!',
   'Duration': 'Süre',
   'Volume': 'Hacim',
+  'Steps': 'Adım',
+  '{0} steps': '{0} adım',
   'PRs': 'Rekorlar',
   'New PR:': 'Yeni rekor:',
   'Nice!': 'Süper!',

@@ -160,6 +160,8 @@ export default {
   'Workout complete!': 'Тренировка завершена!',
   'Duration': 'Время',
   'Volume': 'Объём',
+  'Steps': 'Шаги',
+  '{0} steps': '{0} шагов',
   'PRs': 'Рекорды',
   'New PR:': 'Новый рекорд:',
   'Nice!': 'Отлично!',

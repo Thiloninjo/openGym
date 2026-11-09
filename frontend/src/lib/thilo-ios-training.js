@@ -9,6 +9,8 @@
 //   rest({ endsAt, totalSec, title, doneTitle, speech, sound, lang })   Pause läuft
 //   hold({ leftSec, totalSec, title, doneTitle })                 Pause angehalten
 //   restStop()                                                    Pause übersprungen oder ersetzt
+// Ereignis vom Plugin:
+//   steps { steps, from }   Schritte seit Trainingsbeginn `from` (ms), iPhone-Schrittzähler
 import { MOBILE } from './mobile.js'
 
 let plugin = null
@@ -82,6 +84,22 @@ export function watchTraining(store, { nameOf }) {
     last = snap
     key = k
   })
+}
+
+// Meldet jeden neuen Schrittstand des laufenden Trainings an `onSteps({ n, from })`.
+export function watchSteps(onSteps) {
+  if (!MOBILE) return
+  ready()
+    .then(ok => (ok ? plugin.addListener('steps', d => onSteps({ n: Number(d?.steps) || 0, from: Number(d?.from) || 0 })) : undefined))
+    .then(() => {}, err => report('addListener', err))
+}
+
+// Die Schritte, die zu diesem Training gehören: nur ein Stand, der ab seinem Beginn zählt (ein
+// Rest aus einem früheren Training zählt nicht). Sonst null, auch im Web und unter Android.
+export function stepsFor(active, steps) {
+  const start = Number(active?.start)
+  if (!start || !steps || active.backfill || active.editingWorkoutId) return null
+  return Math.abs(steps.from - start) < 1000 && Number.isFinite(steps.n) ? steps.n : null
 }
 
 export const iosRestStart = (endsAt, { totalSec, title, doneTitle, sound, lang } = {}) =>

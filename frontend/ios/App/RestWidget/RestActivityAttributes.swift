@@ -20,6 +20,7 @@ public struct RestActivityAttributes: ActivityAttributes {
         public var restTitle: String     // „Pause“ / „Seite wechseln“
         public var doneTitle: String     // nach Ablauf, z. B. „Pause vorbei. Nächster Satz!“
         public var ready: Bool           // Pause abgelaufen, der nächste Satz ist dran
+        public var steps: Int?           // Schritte seit Trainingsbeginn (iPhone-Schrittzähler), sonst nil
     }
     // Beginn des Trainings; die Trainingszeit zählt von hier hoch.
     public var startedAt: Date

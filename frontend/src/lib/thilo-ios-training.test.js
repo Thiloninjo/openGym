@@ -225,3 +225,41 @@ describe('Web und Android', () => {
     }
   })
 })
+
+describe('Schritte', () => {
+  it('stepsFor: nur ein Stand ab Beginn dieses Trainings zählt', async () => {
+    const { stepsFor } = await load()
+    const w = workout()
+    expect(stepsFor(w, { n: 812, from: w.start })).toBe(812)
+    expect(stepsFor(w, { n: 812, from: w.start + 400 })).toBe(812)
+    expect(stepsFor(w, { n: 812, from: w.start - 60_000 })).toBeNull()
+    expect(stepsFor(w, null)).toBeNull()
+    expect(stepsFor(null, { n: 812, from: w.start })).toBeNull()
+    expect(stepsFor(workout({ backfill: {} }), { n: 812, from: w.start })).toBeNull()
+    expect(stepsFor(workout({ editingWorkoutId: 'w1' }), { n: 812, from: w.start })).toBeNull()
+  })
+  it('watchSteps: das Ereignis „steps“ kommt als { n, from } an', async () => {
+    let listener = null
+    h.registerPlugin = vi.fn(() => new Proxy({}, {
+      get: (_, prop) => {
+        if (prop === 'then') return () => new Promise(() => {})
+        if (prop === 'addListener') return (name, fn) => { h.calls.push(['addListener', name]); listener = fn; return Promise.resolve({ remove() {} }) }
+        return () => Promise.resolve({})
+      },
+    }))
+    const { watchSteps } = await load()
+    const got = []
+    watchSteps(s => got.push(s))
+    await settle()
+    expect(h.calls).toEqual([['addListener', 'steps']])
+    listener({ steps: 812, from: 1_700_000_000_000 })
+    expect(got).toEqual([{ n: 812, from: 1_700_000_000_000 }])
+  })
+  it('Android: kein Listener', async () => {
+    h.platform = 'android'
+    const { watchSteps } = await load()
+    watchSteps(() => {})
+    await settle()
+    expect(h.registerPlugin).not.toHaveBeenCalled()
+  })
+})

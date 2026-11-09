@@ -164,6 +164,8 @@ export default {
   'Workout complete!': '운동 완료!',
   'Duration': '시간',
   'Volume': '볼륨',
+  'Steps': '걸음 수',
+  '{0} steps': '{0}걸음',
   'PRs': '신기록',
   'New PR:': '신기록:',
   'Nice!': '좋아요!',

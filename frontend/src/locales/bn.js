@@ -195,6 +195,8 @@ export default {
   'Workout complete!': 'ওয়ার্কআউট সম্পন্ন!',
   'Duration': 'সময়কাল',
   'Volume': 'ভলিউম',
+  'Steps': 'ধাপ',
+  '{0} steps': '{0} ধাপ',
   'PRs': 'রেকর্ড',
   'New PR:': 'নতুন রেকর্ড:',
   'Nice!': 'দারুণ!',

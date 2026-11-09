@@ -162,6 +162,8 @@ export default {
   'Workout complete!': 'Edzés kész!',
   'Duration': 'Időtartam',
   'Volume': 'Volumen',
+  'Steps': 'Lépések',
+  '{0} steps': '{0} lépés',
   'PRs': 'Rekordok',
   'New PR:': 'Új rekord:',
   'Nice!': 'Szuper!',

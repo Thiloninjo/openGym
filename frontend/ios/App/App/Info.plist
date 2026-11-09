@@ -70,6 +70,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Used to scan your gym membership QR code, and to take a photo or video of an exercise you add yourself.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Zählt deine Schritte während des Trainings.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Used to record the sound of a video you take of an exercise you add yourself.</string>
 </dict>

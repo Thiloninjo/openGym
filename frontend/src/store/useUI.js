@@ -7,7 +7,7 @@ import { t, getLang, exerciseNameFor } from '../lib/i18n.js'
 import { deviceId } from '../lib/push.js'
 import { MOBILE } from '../lib/mobile.js'
 import { armRestAlert, bindNativeRest, disarmRestAlert, holdRestAlert, toneNative } from '../lib/rest-alert.js'
-import { iosRestHold, iosRestStart, iosRestStop, iosSpeaksRestEnd, watchTraining } from '../lib/thilo-ios-training.js'
+import { iosRestHold, iosRestStart, iosRestStop, iosSpeaksRestEnd, watchSteps, watchTraining } from '../lib/thilo-ios-training.js'
 import { exOr } from '../lib/exercises.js'
 import { useStore } from './useStore.js'
 import { REST_MAX } from '../lib/duration.js'
@@ -231,6 +231,7 @@ export const useUI = create((set, get) => ({
                        // forSet: index of that set in the entry's rows, so removing the set stops its rest
                        // paused: held at `left`; `endsAt` means nothing until resumeRest sets it again
   work: null,          // work countdown DURING a timed set (issue #16) — { left, total, endsAt, label, overtime? }
+  steps: null,         // Thilos Fork: { n, from } Schritte seit Trainingsbeginn `from` (iPhone, lib/thilo-ios-training.js)
   timerFlashId: 0,     // changing the id retriggers the theme-blink visual alert
 
   flashTimer() {
@@ -496,6 +497,8 @@ export function restoreRest(now = Date.now()) {
 }
 useUI.subscribe((s, prev) => { if (s.timer !== prev.timer) saveRest(s.timer) })
 // Thilos Fork: das laufende Training als Live-Aktivität in der iPhone-App (lib/thilo-ios-training.js).
+// Der Listener zuerst: der Start eines schon laufenden Trainings meldet den Schrittstand gleich.
+watchSteps(steps => useUI.setState({ steps }))
 watchTraining(useStore, { nameOf: id => exerciseNameFor(exOr(id)) })
 restoreRest()
 

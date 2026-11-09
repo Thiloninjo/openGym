@@ -19,6 +19,7 @@ vi.mock('../lib/thilo-ios-training.js', () => ({
   iosRestStop: vi.fn(),
   iosSpeaksRestEnd: vi.fn(() => h.speaks),
   watchTraining: vi.fn(() => () => {}),
+  watchSteps: vi.fn(),
 }))
 vi.mock('../lib/sound.js', () => ({ beep: vi.fn(), chime: vi.fn(), vibrate: vi.fn(), alertBuzz: vi.fn() }))
 vi.mock('../lib/api.js', () => ({ api: vi.fn(() => Promise.resolve({ ok: true })) }))

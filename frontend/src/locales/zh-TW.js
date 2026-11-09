@@ -160,6 +160,8 @@ export default {
   'Workout complete!': '訓練完成！',
   'Duration': '時間',
   'Volume': '總訓練量',
+  'Steps': '步數',
+  '{0} steps': '{0} 步',
   'PRs': '個人紀錄',
   'New PR:': '突破個人紀錄：',
   'Nice!': '太棒了！',

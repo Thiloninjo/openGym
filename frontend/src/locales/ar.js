@@ -168,6 +168,8 @@ export default {
   'Workout complete!': 'اكتمل التمرين!',
   'Duration': 'المدة',
   'Volume': 'حجم التدريب',
+  'Steps': 'الخطوات',
+  '{0} steps': '{0} خطوة',
   'PRs': 'الأرقام القياسية',
   'New PR:': 'رقم قياسي جديد:',
   'Nice!': 'رائع!',

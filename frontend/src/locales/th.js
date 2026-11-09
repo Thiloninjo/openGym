@@ -162,6 +162,8 @@ export default {
   'Workout complete!': 'ออกกำลังกายเสร็จสิ้น!',
   'Duration': 'ระยะเวลา',
   'Volume': 'ปริมาณงาน',
+  'Steps': 'ก้าว',
+  '{0} steps': '{0} ก้าว',
   'PRs': 'สถิติใหม่',
   'New PR:': 'สถิติใหม่:',
   'Nice!': 'เยี่ยม!',

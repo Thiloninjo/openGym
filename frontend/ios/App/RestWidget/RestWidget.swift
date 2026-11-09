@@ -1,5 +1,6 @@
 // Thilos Fork: das laufende Training auf dem Sperrbildschirm und in der Dynamic Island.
 // Training: Übung, Satz x von y und die Trainingszeit. Pause: Countdown mit Fortschrittsbalken.
+// Die Schritte seit Trainingsbeginn stehen oben neben dem Namen (Insel: unten neben dem Satz).
 // Danach (Ablauf, auch per staleDate, wenn die App nicht mehr läuft): „Nächster Satz“.
 // Text(timerInterval:) und ProgressView(timerInterval:) zählen selbst, die App muss dafür nicht laufen.
 import ActivityKit
@@ -31,6 +32,11 @@ private func setLine(_ s: LiveState) -> String {
 
 private func joined(_ parts: [String]) -> String {
     parts.filter { !$0.isEmpty }.joined(separator: " · ")
+}
+
+private func stepsLine(_ s: LiveState) -> String {
+    guard let n = s.steps else { return "" }
+    return "\(n.formatted(.number.locale(Locale(identifier: "de_DE")))) Schritte"
 }
 
 private func headline(_ s: LiveState, _ p: LivePhase) -> String {
@@ -100,7 +106,7 @@ struct LiveLockView: View {
         let more = detail(state, p)
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(state.name.isEmpty ? "openGym" : state.name)
+                Text(joined([state.name.isEmpty ? "openGym" : state.name, stepsLine(state)]))
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
@@ -185,7 +191,7 @@ struct RestLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(detail(context.state, p))
+                        Text(joined([detail(context.state, p), stepsLine(context.state)]))
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.75))
                             .lineLimit(1)

@@ -146,6 +146,8 @@ export default {
   'Workout complete!': 'Тренування завершено!',
   'Duration': 'Час',
   'Volume': 'Обсяг',
+  'Steps': 'Кроки',
+  '{0} steps': '{0} кроків',
   'PRs': 'Рекорди',
   'New PR:': 'Новий рекорд:',
   'Nice!': 'Чудово!',
