@@ -56,6 +56,8 @@ import { useAutoMore } from './lib/use-auto-more.js'
 import { isFav, toggleFav, sortFavouritesFirst, sortYoursFirst } from './lib/favourites.js'
 import { buildSessionEntries, buildPlannedEntry, builtOutOfProgression } from './lib/session-start.js'
 import { finishCompare, finishCardio } from './lib/finish-compare.js'
+import { progressCount } from './lib/thilo-target.js'
+import { thiloRules } from './lib/thilo-rules.js'
 import { workoutFit, fitFileName } from './lib/fit-export.js'
 import { joinSessionNoProg } from './lib/session-noprog.js'
 import { buildCombinedEntries, deriveSessionName } from './lib/session-merge.js'
@@ -3285,6 +3287,8 @@ function CardioDone({ st, w }) {
 
 function FinishSummary({ w, prs, e1prs = [], close }) {
   const st = useStore(s => s.S)
+  // Thilos Fork: wie viele Übungen gegenüber dem letzten Mal gesteigert wurden (lib/thilo-target.js).
+  const prog = thiloRules() ? progressCount(finishCompare(st, w), st.unit) : null
   return <div style={{ textAlign: 'center', padding: '8px 0' }}>
     <div style={{ fontSize: 44, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="trophy" /></div>
     <h3 style={{ margin: '8px 0' }}>{t('Workout complete!')}</h3>
@@ -3294,6 +3298,11 @@ function FinishSummary({ w, prs, e1prs = [], close }) {
       <div className="tile"><div className="l">{t('Sets')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{setsWorkCount(setsDone(w), workSetsDone(w))}</div></div>
       <div className="tile"><div className="l">{t('PRs')}</div><div className="v" style={{ fontSize: 20 }}>{prs.length || '–'}</div></div>
       {w.steps != null && <div className="tile" style={{ gridColumn: '1 / -1' }}><div className="l">{t('Steps')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fmtNum(w.steps)}</div></div>}
+      {prog && prog.of > 0 && <div className="tile" style={{ gridColumn: '1 / -1' }} data-testid="thilo-progress">
+        <div className="l">{t('Progression')}</div>
+        <div className="v" style={{ fontSize: '1.1rem' }}>{t('{0} of {1} exercises up', prog.up.length, prog.of)}</div>
+        {prog.up.length > 0 && <div className="small accent">{prog.up.map(u => `${EXIDX[u.id] ? exerciseNameFor(EXIDX[u.id]) : u.id} ${u.plus}`).join(' · ')}</div>}
+      </div>}
     </div>
     {(prs.length > 0 || e1prs.length > 0) && <div style={{ textAlign: 'start', marginBottom: 12 }}>
       {prs.map(id => <div key={id} className="small accent row" style={{ gap: 5 }}><Icon name="trophy" style={{ fontSize: 13 }} />{t('New PR:')} <span className={exerciseNameClass(EXIDX[id])}>{EXIDX[id] ? exerciseNameFor(EXIDX[id]) : id}</span></div>)}
