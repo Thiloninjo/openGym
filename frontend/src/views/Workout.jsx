@@ -6,7 +6,7 @@ import { useStore } from '../store/useStore.js'
 import { workoutControls } from '../lib/workout-controls.js'
 import { useUI } from '../store/useUI.js'
 import { stepsFor } from '../lib/thilo-ios-training.js'
-import { exOr, betterWeight } from '../lib/exercises.js'
+import { exOr, betterWeight, isAssisted } from '../lib/exercises.js'
 import { usesBar } from '../lib/bar.js'
 import { loadKindFor, baseWeightFor, inventoryFor, rowLoad, sameLoad, plateDelta, dropGrid } from '../lib/plates.js'
 import { effectiveRoutines, effectiveRoutineIds, lastEntryFor, bestWeightFor, bestWeightForEntry, buildSets, freestyleConfig, defaultConfig, setsDoneActive, setUnitsTotal, supersetUnits, unitOf, setLabel, modeOf, isBw, isPerSide, repStep, EFFORT, effortOf, stepEffort, capEffort, cascadeWeight, insertWarmupRow, barFloor, makeWarmupAt, canBeWarmup, makeWorkAt, removeRowAt, removeLastSet, setSpanAt, copyRowAt, copySpanAt, insertRowAt, pairAdjacent, unpairSuperset, cleanupSg, applyIntensifierPlan, pinnedNoteFor, exNoteFor, setsRepsOf } from '../lib/history.js'
@@ -32,6 +32,10 @@ import { afterScrollRestore, scrollRestorePending } from '../components/Modals.j
 import { effortColor } from '../lib/effort.js'
 import Elapsed from '../components/Elapsed.jsx'
 import ThiloMiniHistory from '../components/ThiloMiniHistory.jsx'
+import ThiloTargetCard from '../components/ThiloTargetCard.jsx'
+import { targetCard, prevSetAt, setDelta } from '../lib/thilo-target.js'
+import { thiloRules } from '../lib/thilo-rules.js'
+import { haptic } from '../lib/thilo-haptics.js'
 import Icon from '../components/Icon.jsx'
 import { Button, Check, NumberField } from '../components/ui.jsx'
 import { defaultIncrement, weightIncrement, stepWeight } from '../lib/progression.js'
@@ -210,6 +214,10 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   // the session was built so the reason matches the numbers already in the rows.
   const plan = entry.plan
   const guidance = progressionGuidance(plan)
+  // Thilos Fork: Zielkarte statt der Hinweiszeile und Satzvergleich je Zeile (lib/thilo-target.js).
+  const thilo = thiloRules()
+  const target = thilo ? targetCard({ plan, last, planned: entry.planned, mode, unit: S.unit, id: entry.id, speedUnit: speedUnitOf(S) }) : null
+  const assisted = isAssisted(entry.id)
   // The plan this exercise was built from (issue #275), on one quiet line in every view — the
   // routine's "2 × 10" is the thing the rows are measured against. When today's rows open
   // somewhere else, the same line says so: progression moved the sets or reps (a bodyweight
@@ -644,6 +652,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
     {/* Kept out of progression: by hand for this session (the ⋯ menu, with its undo right here),
         or by a deload or rehab routine, which owns that choice and offers no undo. On in every
         view, compact included: it changes what the next session is built from. */}
+    {target && <ThiloTargetCard model={target} onOpen={onProgressionSettings} />}
     {entry.noProg === true && <div className="noprog">
       <Icon name="chartLineSlash" /><span>{t('Not counted for progression')}</span>
       {onNoProg && <button type="button" className="chip" onClick={() => onNoProg(false)}>{t('Undo')}</button>}
@@ -683,7 +692,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
     {refLine}
     {/* Thilos Fork: der Verlauf der Übung gleich darunter */}
     <ThiloMiniHistory S={H} exId={entry.id} onOpen={() => exerciseHistorySheet(entry.id)} />
-    {guidance && onProgressionSettings && <button type="button" className={'progline' + (plan.kind === 'deload' ? ' warn' : '')}
+    {!thilo && guidance && onProgressionSettings && <button type="button" className={'progline' + (plan.kind === 'deload' ? ' warn' : '')}
       aria-label={t('Open exercise settings')} onClick={onProgressionSettings}>
       <Icon name={plan.kind === 'up' ? 'arrowUp' : plan.kind === 'deload' ? 'arrowDown' : 'lightbulb'} />
       <span><strong>{t(guidance.policyLabel)}</strong> · {t(...guidance.why)}</span>
@@ -729,6 +738,15 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
               </div>
             </div>
           ) : pairHead ? <>{plainRow(s, i)}{plainRow(entry.sets[i + 1], i + 1)}</> : plainRow(s, i))}
+          {thilo && !warm && (() => {
+            const prev = prevSetAt(last, entry.sets, i)
+            if (!prev) return null
+            const d = s.done ? setDelta(prev, s, { mode, unit: S.unit, assisted }) : null
+            return <div className="thilo-cmp" data-testid="thilo-cmp">
+              <span>{t('last time {0}', setLabel(entry.id, prev, last.target, speedUnitOf(S)))}</span>
+              {d && <span className={'d' + (d.sign > 0 ? ' up' : '')}>{d.text}</span>}
+            </div>
+          })()}
           {swipeHint && swipeHint.i === i && swipeOn && <div className="swhint">
             <button type="button" onClick={() => setUI({ swipeHint: null })}>
               <Icon name="swap" /><span>{t('Psst: swipe a set. Left deletes, right copies.')}</span><Icon name="xmark" />
@@ -1635,6 +1653,10 @@ function ActiveWorkout() {
     if (typeof document !== 'undefined') { const a = document.activeElement; if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) a.blur?.() }
     const m = modeAt(idx)
     const cardioEntry = m === 'cardio'
+    // Thilos Fork: ein Satz, der das letzte Mal schlägt, bekommt beim Abhaken den Erfolgs-Impuls.
+    const en0 = A.entries[idx]
+    const prev0 = thiloRules() && !side && !en0.sets[i].done ? prevSetAt(lastEntryFor(sessionHistory(S), en0.id, en0.rid), en0.sets, i) : null
+    const better = !!prev0 && setDelta(prev0, en0.sets[i], { mode: m, unit: S.unit, assisted: isAssisted(en0.id) })?.sign > 0
     let exJustDone = false, workoutDone = false, checked = false
     update(s => {
       const e = s.active.entries[idx]
@@ -1648,7 +1670,7 @@ function ActiveWorkout() {
       // A finished row has no use for a plan set aside by a hold that did not finish.
       if (checked && e.sets[i].planSec != null) delete e.sets[i].planSec
       if (e.sets[i].done && !editing) {
-        if (!quiet) { beep(S.sound, 1040, 0.12); vibrate(30) }
+        if (!quiet) { beep(S.sound, 1040, 0.12); if (better) haptic('success'); else vibrate(30) }
         // The unit that owns the ticked set — not the marked one. Since !92 the marker no longer
         // follows a finished exercise, and in list mode any exercise can be worked on, so judging
         // the marker's unit here declared the workout complete after one set elsewhere.
