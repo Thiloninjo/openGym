@@ -34,6 +34,13 @@ Code: `lib/progression.js` (`policyFor`, `readSession`, `workingWeight`, `nextPr
 kleine Kurve des schwersten Satzes (bis 10 Sessions), die letzten 4 Sessions mit Datum und allen Sätzen,
 aus allen Routinen. „Übungsverlauf ›“ öffnet die ganze Ansicht.
 
+## Zielkarte und Satzvergleich (10.11.2026)
+
+Oben an jeder Übung eine Zielkarte („↑ Heute: 1 Stufe höher“, „Heute: 13 Wdh. pro Satz“, mit dem letzten Mal),
+je Satz „letztes Mal 52×12“ und nach dem Abhaken ein Chip (+5 kg, +1, =, −1) mit Erfolgs-Impuls bei einem besseren
+Satz; am Ende die Kachel „Progression: n von m Übungen gesteigert“. Ersetzt im Fork die Hinweiszeile `progline`.
+Spec: `2026-11-10-progression-push.md`, Code: `lib/thilo-target.js`, `components/ThiloTargetCard.jsx`.
+
 ## Offen
 
 - Thilos echte Routinen nicht geprüft (Serverzugriff abgelehnt): ob Übungen ausdrücklich eine andere
